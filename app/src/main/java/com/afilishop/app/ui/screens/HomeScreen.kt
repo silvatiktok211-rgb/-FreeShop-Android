@@ -44,12 +44,22 @@ private val Orange = Color(0xFFFF641F)
 private val Page = Color(0xFFFFFDF9)
 private val Ink = Color(0xFF171717)
 private val artwork = mapOf(
-    "automotivo" to "automotivo.webp", "bebes" to "bebes-infantil.webp",
-    "beleza-e-cuidados" to "beleza-cuidados.webp", "brinquedos" to "brinquedos.webp",
-    "calcados" to "moda.webp", "casa-e-cozinha" to "casa-cozinha.webp",
-    "casa-e-decoracao" to "casa-decoracao.webp", "eletronicos" to "eletronicos.webp",
-    "esportes" to "esportes.webp", "games" to "games.webp", "informatica" to "informatica.webp",
-    "pet-shop" to "pet-shop.webp", "smartphones" to "smartphones.webp",
+    "automotivo" to "automotivo.webp",
+    "bebes" to "bebes-infantil.webp", "moda-bebes-e-infantil" to "bebes-infantil.webp",
+    "beleza" to "beleza-cuidados.webp", "beleza-e-cuidados" to "beleza-cuidados.webp",
+    "perfumaria" to "beleza-cuidados.webp", "saude" to "saude.webp",
+    "brinquedos" to "brinquedos.webp",
+    "calcados" to "moda.webp", "moda" to "moda.webp", "moda-feminina" to "moda.webp",
+    "moda-masculina" to "moda.webp", "malas-e-bolsas" to "moda.webp",
+    "casa" to "casa-cozinha.webp", "casa-e-cozinha" to "casa-cozinha.webp",
+    "casa-e-decoracao" to "casa-decoracao.webp",
+    "eletronicos" to "eletronicos.webp", "smartphones" to "smartphones.webp",
+    "esportes" to "esportes.webp", "ferramentas" to "ferramentas.webp",
+    "games" to "games.webp", "video-gamer" to "games.webp",
+    "informatica" to "informatica.webp", "livros" to "livros.webp",
+    "material-escolar" to "material-escolar.webp", "pet-shop" to "pet-shop.webp",
+    "ofertas" to "promocoes-ofertas.webp", "ofertas-do-dia" to "promocoes-ofertas.webp",
+    "promocoes" to "promocoes-ofertas.webp", "outros" to "outros.webp",
 )
 
 @Composable
