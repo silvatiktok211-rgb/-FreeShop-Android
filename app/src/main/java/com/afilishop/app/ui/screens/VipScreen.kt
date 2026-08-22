@@ -74,6 +74,7 @@ fun VipScreen(
     val activity = context as? Activity
     val scope = rememberCoroutineScope()
     var availableSkus by remember { mutableStateOf(emptySet<String>()) }
+    var playPrices by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var vipStatus by remember { mutableStateOf(VipStatusSnapshot()) }
     var extraQuantity by remember { mutableIntStateOf(1) }
     var extraRequestMessage by remember { mutableStateOf<String?>(null) }
@@ -96,7 +97,19 @@ fun VipScreen(
         manager.restorePurchases()
         manager.querySubscriptions(
             state.plans.filter { it.priceBrl > 0 }.mapNotNull { PlayBillingSkus.forPlanCode(it.code) }.ifEmpty { PlayBillingSkus.all },
-        ) { details -> availableSkus = details.map { it.productId }.toSet() }
+        ) { details ->
+            availableSkus = details.map { it.productId }.toSet()
+            playPrices = details.associate { product ->
+                val price = product.subscriptionOfferDetails
+                    ?.firstOrNull()
+                    ?.pricingPhases
+                    ?.pricingPhaseList
+                    ?.lastOrNull()
+                    ?.formattedPrice
+                    .orEmpty()
+                product.productId to price
+            }
+        }
     }
     DisposableEffect(manager, statusRepository) {
         onDispose {
@@ -317,6 +330,7 @@ fun VipScreen(
                     manager = manager,
                     onLogin = onLogin,
                     billingMessage = state.billingMessage,
+                    playPrice = PlayBillingSkus.forPlanCode(plan.code)?.let(playPrices::get)?.takeIf { it.isNotBlank() },
                 )
             }
         }
@@ -333,13 +347,14 @@ private fun PlanCard(
     manager: PlayBillingManager,
     onLogin: () -> Unit,
     billingMessage: String?,
+    playPrice: String?,
 ) {
     val formatter = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp)) {
             Text(plan.name, style = MaterialTheme.typography.titleLarge)
             Text(
-                if (plan.priceBrl <= 0) "Grátis" else formatter.format(plan.priceBrl),
+                if (plan.priceBrl <= 0) "Grátis" else playPrice ?: formatter.format(plan.priceBrl),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 8.dp),
