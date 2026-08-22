@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.afilishop.app.model.Product
 import java.text.NumberFormat
@@ -49,6 +50,7 @@ fun ProductCard(
     favorite: Boolean = false,
     onFavorite: (() -> Unit)? = null,
     onBuy: (() -> Unit)? = null,
+    compact: Boolean = false,
 ) {
     val formatter = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
     val tier = product.priorityTier ?: 0
@@ -78,7 +80,7 @@ fun ProductCard(
                 contentDescription = product.title,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(10.dp),
+                    .padding(if (compact) 8.dp else 10.dp),
                 contentScale = ContentScale.Fit,
             )
 
@@ -150,22 +152,22 @@ fun ProductCard(
             }
         }
 
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 9.dp)) {
+        Column(Modifier.padding(if (compact) 8.dp else 10.dp)) {
             Text(
                 text = product.title,
-                style = MaterialTheme.typography.bodySmall,
+                style = if (compact) MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 15.sp) else MaterialTheme.typography.bodySmall,
                 maxLines = 2,
                 minLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
             )
 
-            Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(if (compact) 3.dp else 7.dp))
 
             product.oldPrice?.takeIf { it > 0 && it > (product.price ?: 0.0) }?.let {
                 Text(
                     text = formatter.format(it),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = if (compact) MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp) else MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textDecoration = TextDecoration.LineThrough,
                 )
@@ -173,13 +175,13 @@ fun ProductCard(
 
             Text(
                 text = product.price?.takeIf { it > 0 }?.let(formatter::format) ?: "Consultar preço",
-                style = MaterialTheme.typography.titleMedium,
+                style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
             )
 
-            if (product.freeShipping) {
+            if (product.freeShipping && !compact) {
                 Text(
                     text = "Frete grátis",
                     style = MaterialTheme.typography.labelSmall,
@@ -193,12 +195,12 @@ fun ProductCard(
                 onClick = onBuy ?: onClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(top = if (compact) 5.dp else 8.dp),
                 shape = CircleShape,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 7.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = if (compact) 4.dp else 7.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             ) {
-                Text("Comprar", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                Text("Comprar", fontWeight = FontWeight.Bold, style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium)
             }
         }
     }

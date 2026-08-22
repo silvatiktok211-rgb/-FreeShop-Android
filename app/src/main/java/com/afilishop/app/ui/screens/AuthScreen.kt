@@ -1,6 +1,7 @@
 package com.afilishop.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -35,6 +37,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -44,7 +47,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -56,22 +58,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
-import com.afilishop.app.BuildConfig
 import com.afilishop.app.ui.AfiliShopViewModel
+import com.afilishop.app.ui.theme.AfiliColors
 
 enum class AuthMode { LOGIN, SIGN_UP, RECOVER }
 
-private val LoginOrange = Color(0xFFF9733A)
-private val LoginInk = Color(0xFF1F2028)
+private val LoginOrange = AfiliColors.Orange
+private val LoginInk = AfiliColors.Ink
 private val LoginMuted = Color(0xFF777680)
-private val LoginBorder = Color(0xFFE7E5E4)
+private val LoginBorder = AfiliColors.Border
 
 @Composable
 fun AuthScreen(
     viewModel: AfiliShopViewModel,
     padding: PaddingValues,
     onDone: () -> Unit,
+    onTerms: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var mode by remember { mutableStateOf(AuthMode.LOGIN) }
@@ -79,6 +81,7 @@ fun AuthScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var acceptedTerms by remember { mutableStateOf(false) }
 
     val title = when (mode) {
         AuthMode.LOGIN -> "Bem-vindo 👋"
@@ -125,17 +128,19 @@ fun AuthScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 36.dp),
             ) {
-                AsyncImage(
-                    model = BuildConfig.API_BASE_URL.trimEnd('/') + "/icon-192.png",
-                    contentDescription = "AfiliShop",
-                    modifier = Modifier
-                        .size(82.dp)
-                        .clip(CircleShape)
-                        .align(Alignment.CenterHorizontally),
-                )
+                Surface(
+                    modifier = Modifier.size(64.dp).align(Alignment.CenterHorizontally),
+                    shape = RoundedCornerShape(24.dp),
+                    color = LoginOrange,
+                    shadowElevation = 10.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("A", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                    }
+                }
 
-                Spacer(Modifier.height(38.dp))
-                Text(title, color = LoginInk, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(40.dp))
+                Text(title, color = LoginInk, fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
                 Text(
                     subtitle,
                     color = LoginMuted,
@@ -197,6 +202,36 @@ fun AuthScreen(
                     )
                 }
 
+                if (mode == AuthMode.SIGN_UP) {
+                    Spacer(Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0x88F6F4F1), RoundedCornerShape(14.dp))
+                            .border(1.dp, LoginBorder, RoundedCornerShape(14.dp))
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = acceptedTerms,
+                            onCheckedChange = { acceptedTerms = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = LoginOrange,
+                                checkmarkColor = Color.White,
+                            ),
+                        )
+                        Text("Eu aceito os ", color = LoginMuted, style = MaterialTheme.typography.labelSmall)
+                        TextButton(onClick = onTerms, contentPadding = PaddingValues(0.dp)) {
+                            Text(
+                                "Termos de Uso",
+                                color = LoginOrange,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
+                }
+
                 if (mode == AuthMode.LOGIN) {
                     TextButton(
                         onClick = { mode = AuthMode.RECOVER; viewModel.clearMessage() },
@@ -219,7 +254,7 @@ fun AuthScreen(
                     enabled = !state.isLoading &&
                         email.contains("@") &&
                         (mode == AuthMode.RECOVER || password.length >= 6) &&
-                        (mode != AuthMode.SIGN_UP || name.trim().length >= 2),
+                        (mode != AuthMode.SIGN_UP || (name.trim().length >= 2 && acceptedTerms)),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = LoginOrange),
                     modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -242,7 +277,7 @@ fun AuthScreen(
                 state.authMessage?.let {
                     Text(
                         it,
-                        color = if (it.contains("erro", true) || it.contains("inválid", true)) Color(0xFFB42318) else LoginOrange,
+                        color = if (it.contains("erro", true) || it.contains("inválid", true) || it.contains("fail", true)) Color(0xFFB42318) else LoginOrange,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
                     )
@@ -261,36 +296,42 @@ fun AuthScreen(
 
                     OutlinedButton(
                         onClick = { },
-                        enabled = false,
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth().height(56.dp),
-                    ) { Text("Google", color = LoginInk, fontWeight = FontWeight.SemiBold) }
+                    ) {
+                        Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Black, modifier = Modifier.padding(end = 10.dp))
+                        Text("Google", color = LoginInk, fontWeight = FontWeight.SemiBold)
+                    }
                     Spacer(Modifier.height(12.dp))
                     OutlinedButton(
                         onClick = { },
-                        enabled = false,
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth().height(56.dp),
-                    ) { Text("Facebook", color = LoginInk, fontWeight = FontWeight.SemiBold) }
+                    ) {
+                        Text("f", color = Color(0xFF1877F2), fontWeight = FontWeight.Black, fontSize = 21.sp, modifier = Modifier.padding(end = 10.dp))
+                        Text("Facebook", color = LoginInk, fontWeight = FontWeight.SemiBold)
+                    }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        if (mode == AuthMode.SIGN_UP) "Já tem uma conta?" else "Ainda não tem conta?",
-                        color = LoginMuted,
-                    )
-                    TextButton(
-                        onClick = {
-                            mode = if (mode == AuthMode.SIGN_UP) AuthMode.LOGIN else AuthMode.SIGN_UP
-                            viewModel.clearMessage()
-                        },
-                        colors = ButtonDefaults.textButtonColors(contentColor = LoginOrange),
+                if (mode != AuthMode.RECOVER) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(if (mode == AuthMode.SIGN_UP) "Entrar" else "Criar conta", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (mode == AuthMode.SIGN_UP) "Já tem uma conta?" else "Ainda não tem conta?",
+                            color = LoginMuted,
+                        )
+                        TextButton(
+                            onClick = {
+                                mode = if (mode == AuthMode.SIGN_UP) AuthMode.LOGIN else AuthMode.SIGN_UP
+                                viewModel.clearMessage()
+                            },
+                            colors = ButtonDefaults.textButtonColors(contentColor = LoginOrange),
+                        ) {
+                            Text(if (mode == AuthMode.SIGN_UP) "Entrar" else "Criar conta", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 

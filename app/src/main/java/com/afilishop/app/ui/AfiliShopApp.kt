@@ -1,13 +1,17 @@
 package com.afilishop.app.ui
 
 import android.content.Intent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -15,6 +19,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.afilishop.app.ui.components.AfiliBottomBar
+import com.afilishop.app.ui.components.AfiliFloatingActions
 import com.afilishop.app.ui.screens.AccountScreen
 import com.afilishop.app.ui.screens.AdminScreen
 import com.afilishop.app.ui.screens.AuthScreen
@@ -39,10 +44,16 @@ import com.afilishop.app.ui.screens.VipScreen
 
 @Composable
 fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route.orEmpty()
     val bottomRoutes = setOf("home", "videos", "upload", "vip", "account")
+    val hideOverlays = currentRoute.startsWith("videos") ||
+        currentRoute.startsWith("conversation/") ||
+        currentRoute == "upload" ||
+        currentRoute == "login" ||
+        currentRoute == "reset-password"
     val rawDeepLink = initialIntent?.data?.toString().orEmpty()
     val isRecoveryLink = rawDeepLink.contains("type=recovery", ignoreCase = true) || initialIntent?.data?.host == "reset-password"
     val recoveryParams: Map<String, String> = remember(rawDeepLink) {
@@ -69,6 +80,7 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = Color(0xFFFFFDF9),
         bottomBar = {
             if (currentRoute in bottomRoutes) {
                 AfiliBottomBar(
@@ -84,11 +96,12 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
             }
         },
     ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = if (isRecoveryLink) "reset-password" else "home",
-            modifier = Modifier.fillMaxSize(),
-        ) {
+        Box(Modifier.fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = if (isRecoveryLink) "reset-password" else "home",
+                modifier = Modifier.fillMaxSize(),
+            ) {
             composable("home") {
                 HomeScreen(
                     viewModel = viewModel,
@@ -97,6 +110,7 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
                     onSearch = { navController.navigate("explore") },
                     onNotifications = { navController.navigate("notifications") },
                     onVideos = { navController.navigate("videos") },
+                    onSignUp = { navController.navigate("login") },
                 )
             }
             composable("explore") {
@@ -137,7 +151,6 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
                     onFavorites = { navController.navigate("favorites") },
                     onPoints = { navController.navigate("points") },
                     onSettings = { navController.navigate("settings") },
-                    onTerms = { navController.navigate("terms") },
                 )
             }
             composable("terms") {
@@ -241,7 +254,12 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
                 UploadScreen(viewModel, padding, onBack = { navController.popBackStack() })
             }
             composable("login") {
-                AuthScreen(viewModel, padding, onDone = { navController.popBackStack() })
+                AuthScreen(
+                    viewModel = viewModel,
+                    padding = padding,
+                    onDone = { navController.popBackStack() },
+                    onTerms = { navController.navigate("terms") },
+                )
             }
             composable("reset-password") {
                 ResetPasswordScreen(viewModel, padding, onDone = { navController.navigate("account") })
@@ -252,6 +270,20 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
             ) { entry ->
                 val id = entry.arguments?.getString("id").orEmpty()
                 ProductDetailScreen(viewModel, id, padding, onBack = { navController.popBackStack() })
+            }
+            }
+
+            if (!hideOverlays && currentRoute.isNotBlank()) {
+                AfiliFloatingActions(
+                    bottomPadding = if (currentRoute in bottomRoutes) 88.dp else 20.dp,
+                    showAdmin = state.isAdmin,
+                    onAdmin = { navController.navigate("admin") },
+                    onPostVideo = { navController.navigate("upload") },
+                    onLive = { navController.navigate("lives") },
+                    onCommunity = { navController.navigate("community") },
+                    onSettings = { navController.navigate("settings") },
+                    onSupport = { navController.navigate(if (state.user == null) "login" else "account") },
+                )
             }
         }
     }
