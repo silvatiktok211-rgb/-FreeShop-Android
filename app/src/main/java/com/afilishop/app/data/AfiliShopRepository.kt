@@ -68,8 +68,12 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
 
@@ -79,9 +83,10 @@ class AfiliShopRepository(context: Context) {
     private val anonKey = BuildConfig.SUPABASE_ANON_KEY
     private val configured = supabaseUrl.isNotBlank() && anonKey.isNotBlank()
     private val sessionStore = SessionStore(appContext)
+    private val jsonCodec = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
     private val client = HttpClient(Android) {
         install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false })
+            json(jsonCodec)
         }
         expectSuccess = false
     }
@@ -121,13 +126,13 @@ class AfiliShopRepository(context: Context) {
 
     suspend fun loadHome(): HomePayload {
         if (!configured) return HomePayload()
-        val products = runCatching {
-            getTable<Product>("products", mapOf(
-                "select" to "id,title,price,currency,image_url,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id",
-                "order" to "priority_tier.desc,created_at.desc",
-                "limit" to "1000"
-            ))
-        }.getOrElse { emptyList() }
+        // The storefront is public on the website as well. This request intentionally
+        // works with only the anon key when there is no authenticated session.
+        val products = getTable<Product>("products", mapOf(
+            "select" to "id,title,price,currency,image_url,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id",
+            "order" to "priority_tier.desc,created_at.desc",
+            "limit" to "120"
+        ))
         val categories = runCatching {
             getTable<Category>("categories", mapOf("select" to "id,name,slug,icon", "order" to "name.asc"))
         }.getOrElse { emptyList() }
@@ -193,8 +198,9 @@ class AfiliShopRepository(context: Context) {
             header("Content-Type", "application/json")
             setBody(SignInRequest(email, password))
         }
-        if (response.status != HttpStatusCode.OK) error("Não foi possível entrar (${response.status.value}).")
-        response.body<AuthSession>().also { session = it; sessionStore.write(it) }
+        val body = response.bodyAsText()
+        if (response.status != HttpStatusCode.OK) error(authError(body, "Não foi possível entrar (${response.status.value})."))
+        jsonCodec.decodeFromString<AuthSession>(body).also { session = it; sessionStore.write(it) }
     }
 
     suspend fun signUp(email: String, password: String, displayName: String): Result<AuthSession?> = runCatching {
@@ -204,8 +210,24 @@ class AfiliShopRepository(context: Context) {
             header("Content-Type", "application/json")
             setBody(SignUpRequest(email, password, mapOf("display_name" to displayName)))
         }
-        if (response.status.value !in 200..299) error("Não foi possível criar a conta (${response.status.value}).")
-        if (response.bodyAsText().isBlank()) null else response.body<AuthSession>().also { session = it; sessionStore.write(it) }
+        val body = response.bodyAsText()
+        if (response.status.value !in 200..299) error(authError(body, "Não foi possível criar a conta (${response.status.value})."))
+        if (body.isBlank()) null else jsonCodec.decodeFromString<AuthSession>(body).also { session = it; sessionStore.write(it) }
+    }
+
+    private fun authError(body: String, fallback: String): String {
+        val remoteMessage = runCatching {
+            val value = jsonCodec.parseToJsonElement(body).jsonObject
+            listOf("msg", "message", "error_description", "error")
+                .firstNotNullOfOrNull { key -> value[key]?.jsonPrimitive?.contentOrNull }
+        }.getOrNull()?.trim().orEmpty()
+
+        return when (remoteMessage.lowercase()) {
+            "invalid login credentials" -> "E-mail ou senha inválidos."
+            "user already registered" -> "Este e-mail já possui uma conta."
+            "email rate limit exceeded" -> "Muitas tentativas. Aguarde um pouco e tente novamente."
+            else -> remoteMessage.ifBlank { fallback }
+        }
     }
 
     suspend fun isFollowing(followerId: String, followingId: String): Boolean {

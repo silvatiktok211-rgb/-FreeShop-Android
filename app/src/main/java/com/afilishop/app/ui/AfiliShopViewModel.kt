@@ -112,9 +112,20 @@ class AfiliShopViewModel(private val repository: AfiliShopRepository) : ViewMode
     fun refresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val home = repository.loadHome()
             val videos = repository.loadVideos()
-            _uiState.update { it.copy(isLoading = false, home = home, videos = videos) }
+            runCatching { repository.loadHome() }
+                .onSuccess { home ->
+                    _uiState.update { it.copy(isLoading = false, home = home, videos = videos, error = null) }
+                }
+                .onFailure {
+                    _uiState.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            videos = videos,
+                            error = "Não foi possível carregar os produtos. Verifique sua conexão e tente novamente.",
+                        )
+                    }
+                }
         }
     }
 

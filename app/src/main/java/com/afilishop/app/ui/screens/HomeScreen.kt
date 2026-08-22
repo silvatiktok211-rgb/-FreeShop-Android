@@ -89,15 +89,25 @@ fun HomeScreen(
                 }
             }
             item(span = { GridItemSpan(3) }) { QuickLinks() }
-            item(span = { GridItemSpan(3) }) {
-                Column {
-                    SectionHeader("♛  Produtos Premium", "Ver todos", "Produtos publicados por afiliados VIP")
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(premium, key = { it.id }) { p -> Box(Modifier.width(168.dp)) {
-                            ProductCard(p, { onProduct(p.id) }, favorite = p.id in state.favoriteIds,
-                                onFavorite = if (state.user != null) ({ viewModel.toggleFavorite(p.id) }) else null,
-                                onBuy = { openProduct(p, viewModel, context, onProduct) })
-                        } }
+            if (state.home.products.isEmpty()) {
+                item(span = { GridItemSpan(3) }) {
+                    CatalogStatus(
+                        loading = state.isLoading,
+                        message = state.error,
+                        onRetry = viewModel::refresh,
+                    )
+                }
+            } else {
+                item(span = { GridItemSpan(3) }) {
+                    Column {
+                        SectionHeader("♛  Produtos Premium", "Ver todos", "Produtos publicados por afiliados VIP")
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(premium, key = { it.id }) { p -> Box(Modifier.width(168.dp)) {
+                                ProductCard(p, { onProduct(p.id) }, favorite = p.id in state.favoriteIds,
+                                    onFavorite = if (state.user != null) ({ viewModel.toggleFavorite(p.id) }) else null,
+                                    onBuy = { openProduct(p, viewModel, context, onProduct) })
+                            } }
+                        }
                     }
                 }
             }
@@ -112,13 +122,32 @@ fun HomeScreen(
             if (state.user == null) item(span = { GridItemSpan(3) }) {
                 WelcomeCard(onSignUp)
             }
-            item(span = { GridItemSpan(3) }) { Text("Para você", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Ink, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp)) }
-            items(state.home.products, key = { it.id }) { p -> ProductCard(
-                p, { onProduct(p.id) }, Modifier.padding(horizontal = 2.dp), p.id in state.favoriteIds,
-                if (state.user != null) ({ viewModel.toggleFavorite(p.id) }) else null,
-                { openProduct(p, viewModel, context, onProduct) },
-                compact = true,
-            ) }
+            if (state.home.products.isNotEmpty()) {
+                item(span = { GridItemSpan(3) }) { Text("Para você", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Ink, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp)) }
+                items(state.home.products, key = { it.id }) { p -> ProductCard(
+                    p, { onProduct(p.id) }, Modifier.padding(horizontal = 2.dp), p.id in state.favoriteIds,
+                    if (state.user != null) ({ viewModel.toggleFavorite(p.id) }) else null,
+                    { openProduct(p, viewModel, context, onProduct) },
+                    compact = true,
+                ) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CatalogStatus(loading: Boolean, message: String?, onRetry: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxWidth().height(116.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            loading -> CircularProgressIndicator(color = Orange)
+            message != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(message, color = Color(0xFF686A73), textAlign = TextAlign.Center)
+                TextButton(onClick = onRetry) { Text("Tentar novamente", color = Orange, fontWeight = FontWeight.Bold) }
+            }
+            else -> Text("Nenhum produto disponível agora.", color = Color(0xFF686A73))
         }
     }
 }
