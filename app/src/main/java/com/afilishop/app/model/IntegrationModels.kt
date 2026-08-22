@@ -226,6 +226,17 @@ data class SubscriptionPlan(
 )
 
 @Serializable
+data class PlanFeature(
+    val key: String,
+    val name: String,
+    @SerialName("min_tier") val minTier: Int = 0,
+    @SerialName("limit_value") val limitValue: Int? = null,
+    @SerialName("limit_period") val limitPeriod: String? = null,
+    @SerialName("sort_order") val sortOrder: Int = 0,
+    @SerialName("is_active") val isActive: Boolean = true,
+)
+
+@Serializable
 data class FavoriteTogglePayload(
     @SerialName("user_id") val userId: String,
     @SerialName("product_id") val productId: String
