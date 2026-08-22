@@ -2,7 +2,7 @@ package com.afilishop.app.ui.components
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.PlayCircle
@@ -20,8 +20,8 @@ fun AfiliBottomBar(selectedRoute: String, onNavigate: (String) -> Unit) {
     val videoMode = selectedRoute == "videos"
     val items = listOf(
         Triple("home", "Início", Icons.Filled.Home),
-        Triple("explore", "Explorar", Icons.Filled.Explore),
         Triple("videos", "Vídeos", Icons.Filled.PlayCircle),
+        Triple("upload", "Postar", Icons.Filled.AddCircle),
         Triple("vip", "VIP", Icons.Filled.LocalOffer),
         Triple("account", "Conta", Icons.Filled.AccountCircle),
     )
