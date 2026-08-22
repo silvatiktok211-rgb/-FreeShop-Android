@@ -41,7 +41,7 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route.orEmpty()
-    val bottomRoutes = setOf("home", "explore", "videos", "vip", "account")
+    val bottomRoutes = setOf("home", "videos", "upload", "vip", "account")
     val rawDeepLink = initialIntent?.data?.toString().orEmpty()
     val isRecoveryLink = rawDeepLink.contains("type=recovery", ignoreCase = true) || initialIntent?.data?.host == "reset-password"
     val recoveryParams: Map<String, String> = remember(rawDeepLink) {
