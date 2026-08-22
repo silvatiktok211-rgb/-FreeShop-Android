@@ -86,6 +86,7 @@ fun VipScreen(
         vipStatus = if (state.user != null) statusRepository.load() else VipStatusSnapshot()
     }
     LaunchedEffect(manager, state.plans) {
+        manager.restorePurchases()
         manager.querySubscriptions(
             state.plans.filter { it.priceBrl > 0 }.mapNotNull { PlayBillingSkus.forPlanCode(it.code) }.ifEmpty { PlayBillingSkus.all },
         ) { details -> availableSkus = details.map { it.productId }.toSet() }
