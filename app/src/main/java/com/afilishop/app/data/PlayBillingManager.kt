@@ -10,6 +10,18 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.QueryProductDetailsParams
 
+object PlayBillingSkus {
+    private val byPlanCode = mapOf(
+        "empreendedor" to "empreendedor_monthly",
+        "professional" to "profissional_monthly",
+        "profissional" to "profissional_monthly",
+        "dominante" to "dominante_monthly",
+    )
+
+    fun forPlanCode(code: String): String? = byPlanCode[code.lowercase()]
+    val all: List<String> = byPlanCode.values.distinct()
+}
+
 class PlayBillingManager(
     context: Context,
     private val onPurchaseToken: (sku: String, purchaseToken: String, acknowledge: () -> Unit) -> Unit
