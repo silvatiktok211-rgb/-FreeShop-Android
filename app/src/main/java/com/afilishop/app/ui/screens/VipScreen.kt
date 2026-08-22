@@ -98,6 +98,7 @@ fun VipScreen(
     }
 
     val plans = state.plans
+    val paidPlans = plans.filter { it.code != "free" && it.priceBrl > 0 }
     val subscription = state.subscription
     val baseLimit = subscription?.slotsTotal ?: plans.firstOrNull { it.tier == (subscription?.tier ?: 0) }?.slots ?: 0
     val normalRemaining = max(baseLimit - vipStatus.usedToday, 0)
@@ -263,9 +264,10 @@ fun VipScreen(
             if (plans.isEmpty()) {
                 item { Text("Nenhum plano ativo foi retornado pelo backend.") }
             }
-            items(plans, key = { it.id }) { plan ->
+            item { Text("Escolha seu plano", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black) }
+            items(paidPlans, key = { it.id }) { plan ->
                 val currentTier = subscription?.tier ?: 0
-                val isCurrent = state.user != null && plan.tier == currentTier
+                val isCurrent = state.user != null && (subscription?.planId == plan.id || (subscription?.planId == null && plan.tier == currentTier))
                 PlanCard(
                     plan = plan,
                     loggedIn = state.user != null,
@@ -306,6 +308,10 @@ private fun PlanCard(
                 "${plan.slots} produtos ativos • ${plan.slots} buscas de IA por dia${plan.durationDays?.let { " • $it dias" } ?: ""}",
                 style = MaterialTheme.typography.labelMedium,
             )
+
+            plan.benefits.take(3).forEach { benefit ->
+                RowBenefit(benefit)
+            }
 
             when {
                 isCurrent -> Button(
