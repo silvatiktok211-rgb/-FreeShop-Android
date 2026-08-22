@@ -114,20 +114,21 @@ fun VipScreen(
         vipStatus = if (state.user != null) statusRepository.load() else VipStatusSnapshot()
     }
     LaunchedEffect(manager, state.plans) {
-        manager.restorePurchases()
-        manager.querySubscriptions(
-            state.plans.filter { it.priceBrl > 0 }.mapNotNull { PlayBillingSkus.forPlanCode(it.code) }.ifEmpty { PlayBillingSkus.all },
-        ) { details ->
-            availableSkus = details.map { it.productId }.toSet()
-            playPrices = details.associate { product ->
-                val price = product.subscriptionOfferDetails
-                    ?.firstOrNull()
-                    ?.pricingPhases
-                    ?.pricingPhaseList
-                    ?.lastOrNull()
-                    ?.formattedPrice
-                    .orEmpty()
-                product.productId to price
+        manager.restorePurchases {
+            manager.querySubscriptions(
+                state.plans.filter { it.priceBrl > 0 }.mapNotNull { PlayBillingSkus.forPlanCode(it.code) }.ifEmpty { PlayBillingSkus.all },
+            ) { details ->
+                availableSkus = details.map { it.productId }.toSet()
+                playPrices = details.associate { product ->
+                    val price = product.subscriptionOfferDetails
+                        ?.firstOrNull()
+                        ?.pricingPhases
+                        ?.pricingPhaseList
+                        ?.lastOrNull()
+                        ?.formattedPrice
+                        .orEmpty()
+                    product.productId to price
+                }
             }
         }
     }
@@ -346,11 +347,11 @@ fun VipScreen(
                     plan = plan,
                     loggedIn = state.user != null,
                     isCurrent = isCurrent,
+                    isDowngrade = state.user != null && currentTier > 0 && plan.tier < currentTier,
                     activity = activity,
                     available = PlayBillingSkus.forPlanCode(plan.code)?.let(availableSkus::contains) == true,
                     manager = manager,
                     onLogin = onLogin,
-                    billingMessage = state.billingMessage,
                     playPrice = PlayBillingSkus.forPlanCode(plan.code)?.let(playPrices::get)?.takeIf { it.isNotBlank() },
                     expiresAt = if (isCurrent) subscription?.expiresAt else null,
                     featureBenefits = planFeatures
@@ -358,6 +359,15 @@ fun VipScreen(
                         .sortedWith(compareBy({ it.sortOrder }, { it.key }))
                         .map { formatFeatureLimit(it.name, it.limitValue, it.limitPeriod) },
                 )
+            }
+            state.billingMessage?.let { message ->
+                item {
+                    Text(
+                        message,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(vertical = 6.dp),
+                    )
+                }
             }
         }
     }
@@ -368,11 +378,11 @@ private fun PlanCard(
     plan: SubscriptionPlan,
     loggedIn: Boolean,
     isCurrent: Boolean,
+    isDowngrade: Boolean,
     activity: Activity?,
     available: Boolean,
     manager: PlayBillingManager,
     onLogin: () -> Unit,
-    billingMessage: String?,
     playPrice: String?,
     expiresAt: String?,
     featureBenefits: List<String>,
@@ -413,6 +423,12 @@ private fun PlanCard(
                     modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
                 ) { Text("Plano atual") }
 
+                isDowngrade -> Button(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                ) { Text("Plano inferior ao atual") }
+
                 plan.priceBrl <= 0 -> Button(
                     onClick = {},
                     enabled = false,
@@ -433,13 +449,6 @@ private fun PlanCard(
                 ) { Text(if (available) "Assinar com Google Play" else "SKU indisponível") }
             }
 
-            billingMessage?.let {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 10.dp),
-                )
-            }
         }
     }
 }
