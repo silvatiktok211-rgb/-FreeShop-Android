@@ -22,6 +22,19 @@ data class VipAiSearchRequest(
 )
 
 @Serializable
+data class VipAiActionRequest(
+    val action: String,
+    val productId: String? = null,
+    val permalink: String? = null,
+    val title: String? = null,
+    val thumbnail: String? = null,
+    val price: Double? = null,
+    val pendingId: String? = null,
+    val affiliateUrl: String? = null,
+    val slotNumber: Int? = null,
+)
+
+@Serializable
 data class VipAiUsage(
     val used: Int = 0,
     val limit: Int = 0,
@@ -46,6 +59,52 @@ data class VipAiProduct(
 )
 
 @Serializable
+data class VipProductAttribute(
+    val name: String = "",
+    val value: String = "",
+)
+
+@Serializable
+data class VipProductReview(
+    val id: String = "",
+    val title: String = "",
+    val content: String = "",
+    val rating: Int = 0,
+    val likes: Int = 0,
+    val dislikes: Int = 0,
+    val date: String = "",
+    val reviewer: String? = null,
+)
+
+@Serializable
+data class VipAiActionResponse(
+    val ok: Boolean = false,
+    val error: String? = null,
+    val message: String? = null,
+    val pendingId: String? = null,
+    val usage: VipAiUsage? = null,
+    val verified: Boolean? = null,
+    val productId: String? = null,
+    val title: String? = null,
+    val price: Double = 0.0,
+    @SerialName("original_price") val originalPrice: Double? = null,
+    val discount: Int = 0,
+    @SerialName("free_shipping") val freeShipping: Boolean = false,
+    @SerialName("available_quantity") val availableQuantity: Int = 0,
+    val thumbnail: String? = null,
+    val images: List<String> = emptyList(),
+    val description: String? = null,
+    val attributes: List<VipProductAttribute> = emptyList(),
+    val reviews: List<VipProductReview> = emptyList(),
+    @SerialName("rating_average") val ratingAverage: Double? = null,
+    @SerialName("rating_count") val ratingCount: Int? = null,
+    val slot: Int? = null,
+    val homeProductId: String? = null,
+    val homePublished: Boolean? = null,
+    val affiliateVerified: Boolean? = null,
+)
+
+@Serializable
 data class VipAiSearchResponse(
     val ok: Boolean = false,
     val error: String? = null,
@@ -64,23 +123,100 @@ class VipAssistantRepository(context: Context) {
         expectSuccess = false
     }
 
-    suspend fun search(query: String, expand: Boolean = false): Result<VipAiSearchResponse> = runCatching {
-        val session = sessionStore.read() ?: error("Faça login para usar a IA VIP.")
-        val token = session.accessToken
+    private suspend fun sessionToken(): String =
+        sessionStore.read()?.accessToken ?: error("Faça login para usar a IA VIP.")
+
+    private fun endpoint(): String {
         val baseUrl = BuildConfig.API_BASE_URL.trimEnd('/')
         require(baseUrl.isNotBlank()) { "Backend da AfiliShop não configurado." }
+        return "$baseUrl/api/mobile/vip/search"
+    }
 
-        val response = client.post("$baseUrl/api/mobile/vip/search") {
-            bearerAuth(token)
+    suspend fun search(query: String, expand: Boolean = false): Result<VipAiSearchResponse> = runCatching {
+        val response = client.post(endpoint()) {
+            bearerAuth(sessionToken())
             header("Content-Type", "application/json")
-            setBody(VipAiSearchRequest(query.trim().take(250), expand))
+            setBody(VipAiSearchRequest(query.trim().take(2048), expand))
         }
         val body = response.body<VipAiSearchResponse>()
-        if (response.status.value !in 200..299 && !body.ok) {
+        if (response.status.value !in 200..299 || !body.ok) {
             error(body.message ?: body.error ?: "Não foi possível pesquisar agora.")
         }
         body
     }
+
+    private suspend fun action(request: VipAiActionRequest): VipAiActionResponse {
+        val response = client.post(endpoint()) {
+            bearerAuth(sessionToken())
+            header("Content-Type", "application/json")
+            setBody(request)
+        }
+        val body = response.body<VipAiActionResponse>()
+        if (response.status.value !in 200..299 || !body.ok) {
+            error(body.message ?: body.error ?: "A IA VIP não conseguiu concluir esta etapa.")
+        }
+        return body
+    }
+
+    suspend fun usage(): Result<VipAiActionResponse> =
+        runCatching { action(VipAiActionRequest(action = "usage")) }
+
+    suspend fun select(product: VipAiProduct): Result<VipAiActionResponse> =
+        runCatching {
+            action(
+                VipAiActionRequest(
+                    action = "select",
+                    productId = product.id,
+                    permalink = product.permalink,
+                    title = product.title,
+                    thumbnail = product.thumbnail,
+                    price = product.price,
+                ),
+            )
+        }
+
+    suspend fun detail(productId: String, pendingId: String): Result<VipAiActionResponse> =
+        runCatching {
+            action(
+                VipAiActionRequest(
+                    action = "detail",
+                    productId = productId,
+                    pendingId = pendingId,
+                ),
+            )
+        }
+
+    suspend fun validate(pendingId: String, affiliateUrl: String): Result<VipAiActionResponse> =
+        runCatching {
+            action(
+                VipAiActionRequest(
+                    action = "validate",
+                    pendingId = pendingId,
+                    affiliateUrl = affiliateUrl.trim(),
+                ),
+            )
+        }
+
+    suspend fun publish(pendingId: String, affiliateUrl: String): Result<VipAiActionResponse> =
+        runCatching {
+            action(
+                VipAiActionRequest(
+                    action = "publish",
+                    pendingId = pendingId,
+                    affiliateUrl = affiliateUrl.trim(),
+                ),
+            )
+        }
+
+    suspend fun delete(slotNumber: Int): Result<VipAiActionResponse> =
+        runCatching {
+            action(
+                VipAiActionRequest(
+                    action = "delete",
+                    slotNumber = slotNumber,
+                ),
+            )
+        }
 
     fun close() {
         client.close()
