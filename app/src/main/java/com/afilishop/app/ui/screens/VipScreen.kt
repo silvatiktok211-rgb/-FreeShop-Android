@@ -1,13 +1,16 @@
 package com.afilishop.app.ui.screens
 
 import android.app.Activity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -17,6 +20,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,7 +40,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -117,29 +124,61 @@ fun VipScreen(
         ) {
             item {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 ) {
-                    Column(Modifier.padding(20.dp)) {
-                        Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
-                        Text(
-                            "AfiliShop VIP",
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
-                        Text(
-                            "IA especializada em produtos do Mercado Livre, ranking de ofertas e ferramentas para afiliados.",
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
-                        Button(
-                            onClick = if (state.user != null) onAssistant else onLogin,
-                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFFF97316), Color(0xFFEC4899), Color(0xFF9333EA)),
+                                ),
+                            ),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(Icons.Default.AutoAwesome, null)
-                            Text(
-                                if (state.user != null) "Usar IA VIP" else "Entrar para usar a IA",
-                                modifier = Modifier.padding(start = 7.dp),
-                                fontWeight = FontWeight.Bold,
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "AFILISHOP VIP",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.ExtraBold,
+                                )
+                                Text(
+                                    "Mais produtos, mais IA, mais alcance",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(top = 7.dp),
+                                )
+                                Text(
+                                    "Escolha o nível que combina com o seu crescimento.",
+                                    color = Color.White.copy(alpha = 0.90f),
+                                    modifier = Modifier.padding(top = 5.dp),
+                                )
+                                Button(
+                                    onClick = if (state.user != null) onAssistant else onLogin,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.White,
+                                        contentColor = MaterialTheme.colorScheme.primary,
+                                    ),
+                                    modifier = Modifier.padding(top = 14.dp),
+                                ) {
+                                    Text(
+                                        if (state.user != null) "Usar IA VIP" else "Entrar para conhecer",
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = Color(0xFFFFD54F),
+                                modifier = Modifier.size(72.dp),
                             )
                         }
                     }
