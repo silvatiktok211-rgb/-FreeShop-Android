@@ -65,13 +65,15 @@ data class LiveGift(
     val emoji: String? = null,
     @SerialName("image_url") val imageUrl: String? = null,
     @SerialName("cost_points") val costPoints: Int = 0,
-    @SerialName("is_active") val isActive: Boolean = true
+    @SerialName("is_active") val isActive: Boolean = true,
+    val benefits: List<String> = emptyList()
 )
 
 @Serializable
 data class UserSubscription(
     val tier: Int? = 0,
     val status: String? = null,
+    @SerialName("plan_id") val planId: String? = null,
     @SerialName("expires_at") val expiresAt: String? = null,
     @SerialName("slots_total") val slotsTotal: Int? = 0,
     @SerialName("slots_used") val slotsUsed: Int? = 0
