@@ -31,7 +31,6 @@ import com.afilishop.app.model.RankingEntry
 import com.afilishop.app.model.SocialVideoInsert
 import com.afilishop.app.model.Store
 import com.afilishop.app.model.SubscriptionPlan
-import com.afilishop.app.model.PlanFeature
 import com.afilishop.app.model.VideoComment
 import com.afilishop.app.model.VideoCommentInsert
 import com.afilishop.app.model.VideoLikeRow
@@ -113,17 +112,21 @@ class AfiliShopRepository(context: Context) {
     }
 
     suspend fun loadHome(): HomePayload {
-        if (!configured) return DemoData.home
-        return runCatching {
-            val products = getTable<Product>("products", mapOf(
+        if (!configured) return HomePayload()
+        val products = runCatching {
+            getTable<Product>("products", mapOf(
                 "select" to "id,title,price,currency,image_url,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id",
                 "order" to "priority_tier.desc,created_at.desc",
-                "limit" to "120"
+                "limit" to "1000"
             ))
-            val categories = getTable<Category>("categories", mapOf("select" to "id,name,slug,icon", "order" to "name.asc"))
-            val banners = getTable<Banner>("banners", mapOf("select" to "id,type,media_url,title,subtitle,link_url", "is_active" to "eq.true", "order" to "sort_order.asc"))
-            HomePayload(products, categories, banners)
-        }.getOrElse { DemoData.home }
+        }.getOrElse { emptyList() }
+        val categories = runCatching {
+            getTable<Category>("categories", mapOf("select" to "id,name,slug,icon", "order" to "name.asc"))
+        }.getOrElse { emptyList() }
+        val banners = runCatching {
+            getTable<Banner>("banners", mapOf("select" to "id,type,media_url,title,subtitle,link_url", "is_active" to "eq.true", "order" to "sort_order.asc"))
+        }.getOrElse { emptyList() }
+        return HomePayload(products, categories, banners)
     }
 
     suspend fun loadProductsByCategory(categoryId: String): List<Product> {
@@ -134,7 +137,7 @@ class AfiliShopRepository(context: Context) {
                 "select" to "id,title,price,currency,image_url,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id",
                 "category_id" to "eq.$categoryId",
                 "order" to "priority_tier.desc,created_at.desc",
-                "limit" to "120"
+                "limit" to "1000"
             ))
         }.getOrElse { emptyList() }
     }
@@ -164,15 +167,15 @@ class AfiliShopRepository(context: Context) {
     }
 
     suspend fun loadVideos(): List<SocialVideo> {
-        if (!configured) return DemoData.videos
+        if (!configured) return emptyList()
         return runCatching {
             getTable<SocialVideo>("social_videos", mapOf(
-                "select" to "id,video_url,thumbnail_url,caption,product_id,user_id,likes_count,comments_count,created_at",
+                "select" to "id,video_url,thumbnail_url,description,product_id,user_id,likes_count,comments_count,created_at",
                 "is_published" to "eq.true",
                 "order" to "created_at.desc",
                 "limit" to "40"
             ))
-        }.getOrElse { DemoData.videos }
+        }.getOrElse { emptyList() }
     }
 
     suspend fun signIn(email: String, password: String): Result<AuthSession> = runCatching {
@@ -256,21 +259,7 @@ class AfiliShopRepository(context: Context) {
 
     suspend fun loadPlans(): List<SubscriptionPlan> {
         if (!configured) return emptyList()
-        return runCatching { getTable<SubscriptionPlan>("subscription_plans", mapOf("select" to "id,code,name,price_brl,slots,tier,duration_days,is_active,benefits", "is_active" to "eq.true", "order" to "sort_order.asc")) }.getOrElse { emptyList() }
-    }
-
-    suspend fun loadPlanFeatures(): List<PlanFeature> {
-        if (!configured) return emptyList()
-        return runCatching {
-            getTable<PlanFeature>(
-                "plan_features",
-                mapOf(
-                    "select" to "key,name,min_tier,limit_value,limit_period,sort_order,is_active",
-                    "is_active" to "eq.true",
-                    "order" to "sort_order.asc",
-                ),
-            )
-        }.getOrElse { emptyList() }
+        return runCatching { getTable<SubscriptionPlan>("subscription_plans", mapOf("select" to "id,code,name,price_brl,slots,tier,duration_days,is_active", "is_active" to "eq.true", "order" to "sort_order.asc")) }.getOrElse { emptyList() }
     }
 
     suspend fun listProductComments(productId: String): List<ProductComment> {
@@ -468,7 +457,7 @@ class AfiliShopRepository(context: Context) {
 
     suspend fun loadSubscription(userId: String): UserSubscription? {
         if (!configured || userId.isBlank()) return null
-        return runCatching { getTable<UserSubscription>("user_subscriptions", mapOf("select" to "plan_id,tier,status,expires_at,slots_total,slots_used", "user_id" to "eq.$userId", "limit" to "1")).firstOrNull() }.getOrNull()
+        return runCatching { getTable<UserSubscription>("user_subscriptions", mapOf("select" to "tier,status,expires_at,slots_total,slots_used", "user_id" to "eq.$userId", "limit" to "1")).firstOrNull() }.getOrNull()
     }
 
     private suspend fun deleteTable(table: String, params: Map<String, String>): Boolean {
