@@ -68,6 +68,8 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
         currentRoute == "reset-password"
     val rawDeepLink = initialIntent?.data?.toString().orEmpty()
     val isRecoveryLink = rawDeepLink.contains("type=recovery", ignoreCase = true) || initialIntent?.data?.host == "reset-password"
+    val isOAuthCallback = initialIntent?.data?.scheme.equals("afilishop", ignoreCase = true) &&
+        initialIntent?.data?.host.equals("auth-callback", ignoreCase = true)
     val recoveryParams: Map<String, String> = remember(rawDeepLink) {
         buildMap {
             rawDeepLink.substringAfter('#', "").split('&').forEach { part ->
@@ -81,10 +83,17 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
     LaunchedEffect(initialIntent) {
         val recoveryAccess = recoveryParams["access_token"]
         val recoveryRefresh = recoveryParams["refresh_token"]
-        if (isRecoveryLink && !recoveryAccess.isNullOrBlank()) {
+        if (isOAuthCallback) {
+            viewModel.completeGoogleSignIn(rawDeepLink) {
+                navController.navigate("home") {
+                    popUpTo("login") { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+        } else if (isRecoveryLink && !recoveryAccess.isNullOrBlank()) {
             viewModel.restoreExternalSession(recoveryAccess, recoveryRefresh)
         }
-        if (!isRecoveryLink) {
+        if (!isRecoveryLink && !isOAuthCallback) {
             val sharedText = initialIntent?.getStringExtra(Intent.EXTRA_TEXT)
             val deepLink = initialIntent?.data?.toString()
             val destination = notificationDestination(notificationLink)

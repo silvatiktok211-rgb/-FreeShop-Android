@@ -251,7 +251,7 @@ fun AuthScreen(
                             AuthMode.RECOVER -> viewModel.requestPasswordReset(email.trim())
                         }
                     },
-                    enabled = !state.isLoading &&
+                    enabled = !state.isAuthenticating &&
                         email.contains("@") &&
                         (mode == AuthMode.RECOVER || password.length >= 6) &&
                         (mode != AuthMode.SIGN_UP || (name.trim().length >= 2 && acceptedTerms)),
@@ -259,7 +259,7 @@ fun AuthScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = LoginOrange),
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                 ) {
-                    if (state.isLoading) {
+                    if (state.isAuthenticating) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
                     } else {
                         Text(
@@ -295,7 +295,8 @@ fun AuthScreen(
                     }
 
                     OutlinedButton(
-                        onClick = { },
+                        onClick = viewModel::signInWithGoogle,
+                        enabled = !state.isAuthenticating,
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                     ) {

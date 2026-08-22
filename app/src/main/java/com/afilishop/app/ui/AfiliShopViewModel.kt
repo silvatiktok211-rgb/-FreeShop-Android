@@ -35,11 +35,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
 
 data class AfiliShopUiState(
     val isLoading: Boolean = true,
+    val isAuthenticating: Boolean = false,
     val isSearching: Boolean = false,
     val home: HomePayload = HomePayload(),
     val videos: List<SocialVideo> = emptyList(),
@@ -84,6 +87,7 @@ data class AfiliShopUiState(
 class AfiliShopViewModel(private val repository: AfiliShopRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(AfiliShopUiState())
     val uiState: StateFlow<AfiliShopUiState> = _uiState.asStateFlow()
+    private var searchJob: Job? = null
 
     init {
         restoreSession()
@@ -145,10 +149,14 @@ class AfiliShopViewModel(private val repository: AfiliShopRepository) : ViewMode
 
     fun search(query: String) {
         _uiState.update { it.copy(query = query) }
-        viewModelScope.launch {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            delay(300)
             _uiState.update { it.copy(isSearching = true) }
             val results = repository.searchProducts(query)
-            _uiState.update { it.copy(isSearching = false, home = it.home.copy(products = results)) }
+            if (_uiState.value.query == query) {
+                _uiState.update { it.copy(isSearching = false, home = it.home.copy(products = results)) }
+            }
         }
     }
 
@@ -164,23 +172,55 @@ class AfiliShopViewModel(private val repository: AfiliShopRepository) : ViewMode
 
     fun signIn(email: String, password: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, authMessage = null) }
+            _uiState.update { it.copy(isAuthenticating = true, authMessage = null) }
             repository.signIn(email, password).onSuccess { session ->
-                _uiState.update { it.copy(isLoading = false, user = session.user, authMessage = "Login realizado") }
+                _uiState.update { it.copy(isAuthenticating = false, user = session.user, authMessage = "Login realizado") }
                 loadAccountData()
                 onSuccess()
-            }.onFailure { error -> _uiState.update { it.copy(isLoading = false, authMessage = error.message) } }
+            }.onFailure { error -> _uiState.update { it.copy(isAuthenticating = false, authMessage = error.message) } }
+        }
+    }
+
+    fun signInWithGoogle() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAuthenticating = true, authMessage = null) }
+            repository.startGoogleSignIn()
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(isAuthenticating = false, authMessage = "Conclua o login na janela segura do Google.")
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(isAuthenticating = false, authMessage = error.message) }
+                }
+        }
+    }
+
+    fun completeGoogleSignIn(rawUrl: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAuthenticating = true, authMessage = null) }
+            repository.completeGoogleSignIn(rawUrl)
+                .onSuccess { session ->
+                    _uiState.update {
+                        it.copy(isAuthenticating = false, user = session.user, authMessage = "Login Google realizado.")
+                    }
+                    loadAccountData()
+                    onSuccess()
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(isAuthenticating = false, authMessage = error.message) }
+                }
         }
     }
 
     fun signUp(email: String, password: String, name: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, authMessage = null) }
+            _uiState.update { it.copy(isAuthenticating = true, authMessage = null) }
             repository.signUp(email, password, name).onSuccess { session ->
-                _uiState.update { it.copy(isLoading = false, user = session?.user, authMessage = "Conta criada. Verifique seu e-mail se solicitado.") }
+                _uiState.update { it.copy(isAuthenticating = false, user = session?.user, authMessage = "Conta criada. Verifique seu e-mail se solicitado.") }
                 loadAccountData()
                 onSuccess()
-            }.onFailure { error -> _uiState.update { it.copy(isLoading = false, authMessage = error.message) } }
+            }.onFailure { error -> _uiState.update { it.copy(isAuthenticating = false, authMessage = error.message) } }
         }
     }
 
@@ -240,8 +280,9 @@ class AfiliShopViewModel(private val repository: AfiliShopRepository) : ViewMode
 
     fun requestPasswordReset(email: String) {
         viewModelScope.launch {
+            _uiState.update { it.copy(isAuthenticating = true, authMessage = null) }
             val ok = repository.requestPasswordReset(email)
-            _uiState.update { it.copy(authMessage = if (ok) "Confira seu e-mail para redefinir a senha." else "Não foi possível enviar o e-mail de recuperação.") }
+            _uiState.update { it.copy(isAuthenticating = false, authMessage = if (ok) "Confira seu e-mail para redefinir a senha." else "Não foi possível enviar o e-mail de recuperação.") }
         }
     }
 
@@ -451,4 +492,10 @@ class AfiliShopViewModel(private val repository: AfiliShopRepository) : ViewMode
     }
 
     fun clearMessage() { _uiState.update { it.copy(authMessage = null, error = null) } }
+
+    override fun onCleared() {
+        searchJob?.cancel()
+        repository.close()
+        super.onCleared()
+    }
 }

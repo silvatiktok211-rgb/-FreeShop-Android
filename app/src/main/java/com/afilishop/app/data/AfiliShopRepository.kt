@@ -1,6 +1,8 @@
 package com.afilishop.app.data
 
 import android.content.Context
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import com.afilishop.app.BuildConfig
 import com.afilishop.app.model.AuthSession
 import com.afilishop.app.model.ChatMessage
@@ -58,6 +60,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
@@ -69,6 +72,12 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
+import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.ExternalAuthAction
+import io.github.jan.supabase.auth.FlowType
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.Google
+import io.github.jan.supabase.createSupabaseClient
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -80,6 +89,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
 
+private const val HOME_CACHE_TTL_MS = 2 * 60 * 1000L
+private const val MEDIA_CACHE_TTL_MS = 2 * 60 * 1000L
+
 class AfiliShopRepository(context: Context) {
     private val appContext = context.applicationContext
     private val supabaseUrl = BuildConfig.SUPABASE_URL.trimEnd('/')
@@ -87,12 +99,36 @@ class AfiliShopRepository(context: Context) {
     private val configured = supabaseUrl.isNotBlank() && anonKey.isNotBlank()
     private val sessionStore = SessionStore(appContext)
     private val jsonCodec = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
+    private val oauthClient by lazy {
+        createSupabaseClient(supabaseUrl, anonKey) {
+            install(Auth) {
+                scheme = AFILISHOP_AUTH_SCHEME
+                host = AFILISHOP_AUTH_HOST
+                flowType = FlowType.PKCE
+                alwaysAutoRefresh = false
+                autoLoadFromStorage = false
+                autoSaveToStorage = false
+                enableLifecycleCallbacks = false
+                defaultExternalAuthAction = ExternalAuthAction.CustomTabs()
+            }
+        }
+    }
     private val client = HttpClient(Android) {
         install(ContentNegotiation) {
             json(jsonCodec)
         }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 20_000
+            connectTimeoutMillis = 12_000
+            socketTimeoutMillis = 20_000
+        }
         expectSuccess = false
     }
+
+    private var cachedHome: HomePayload? = null
+    private var cachedHomeAt = 0L
+    private var cachedVideos: List<SocialVideo>? = null
+    private var cachedVideosAt = 0L
 
     var session: AuthSession? = null
         private set
@@ -127,8 +163,54 @@ class AfiliShopRepository(context: Context) {
         response.body<AuthSession>().also { session = it; sessionStore.write(it) }
     }
 
+    suspend fun startGoogleSignIn(): Result<Unit> = runCatching {
+        require(configured) { "A autenticação ainda não foi configurada." }
+        val authorizeUrl = oauthClient.auth.getOAuthUrl(Google)
+        val response = client.get(authorizeUrl) {
+            header("apikey", anonKey)
+            url.parameters.append("skip_http_redirect", "true")
+        }
+        val body = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            error(authError(body, "Não foi possível abrir o login Google."))
+        }
+        val providerUrl = runCatching {
+            jsonCodec.parseToJsonElement(body).jsonObject["url"]?.jsonPrimitive?.contentOrNull
+        }.getOrNull()?.takeIf { it.startsWith("https://") }
+            ?: error("O Google não retornou uma página de login válida.")
+
+        val customTab = CustomTabsIntent.Builder()
+            .setShowTitle(true)
+            .setUrlBarHidingEnabled(true)
+            .build()
+        customTab.intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        customTab.launchUrl(appContext, Uri.parse(providerUrl))
+    }
+
+    suspend fun completeGoogleSignIn(rawUrl: String): Result<AuthSession> = runCatching {
+        require(configured) { "A autenticação ainda não foi configurada." }
+        val callback = parseOAuthCallback(rawUrl)
+            ?: error("Retorno do Google inválido. Tente entrar novamente.")
+        callback.error?.let {
+            error(if (it.contains("access_denied", ignoreCase = true)) "Login Google cancelado." else it)
+        }
+        val code = callback.code ?: error("O Google não retornou o código de acesso.")
+        val externalSession = oauthClient.auth.exchangeCodeForSession(code, saveSession = false)
+        val externalUser = externalSession.user ?: oauthClient.auth.retrieveUser(externalSession.accessToken)
+        AuthSession(
+            accessToken = externalSession.accessToken,
+            refreshToken = externalSession.refreshToken,
+            expiresIn = externalSession.expiresIn,
+            user = AuthUser(externalUser.id, externalUser.email),
+        ).also {
+            session = it
+            sessionStore.write(it)
+        }
+    }
+
     suspend fun loadHome(): HomePayload {
         if (!configured) return HomePayload()
+        cachedHome?.takeIf { System.currentTimeMillis() - cachedHomeAt < HOME_CACHE_TTL_MS }?.let { return it }
         // The storefront is public on the website as well. These requests intentionally
         // work with only the anon key when there is no authenticated session.
         return coroutineScope {
@@ -162,7 +244,10 @@ class AfiliShopRepository(context: Context) {
                 categories = categories.await(),
                 banners = banners.await(),
                 premiumProducts = premiumProducts.await(),
-            )
+            ).also {
+                cachedHome = it
+                cachedHomeAt = System.currentTimeMillis()
+            }
         }
     }
 
@@ -203,13 +288,17 @@ class AfiliShopRepository(context: Context) {
 
     suspend fun loadVideos(): List<SocialVideo> {
         if (!configured) return emptyList()
+        cachedVideos?.takeIf { System.currentTimeMillis() - cachedVideosAt < MEDIA_CACHE_TTL_MS }?.let { return it }
         return runCatching {
             val videos = getAllTable<SocialVideo>("social_videos", mapOf(
                 "select" to "id,video_url,thumbnail_url,description,is_active,is_featured,product_id,product_external_url,product_title,product_price,product_image,shares_count,views_count,user_id,likes_count,comments_count,created_at",
                 "is_active" to "eq.true",
                 "order" to "created_at.desc",
             ))
-            attachVideoProfiles(videos)
+            attachVideoProfiles(videos).also {
+                cachedVideos = it
+                cachedVideosAt = System.currentTimeMillis()
+            }
         }.getOrElse { emptyList() }
     }
 
@@ -258,11 +347,17 @@ class AfiliShopRepository(context: Context) {
                 .firstNotNullOfOrNull { key -> value[key]?.jsonPrimitive?.contentOrNull }
         }.getOrNull()?.trim().orEmpty()
 
-        return when (remoteMessage.lowercase()) {
+        return when {
+            remoteMessage.contains("missing oauth secret", ignoreCase = true) ->
+                "O login Google precisa ser concluído nas configurações da AfiliShop."
+            remoteMessage.contains("redirect", ignoreCase = true) && remoteMessage.contains("allow", ignoreCase = true) ->
+                "O retorno do login Google ainda não foi autorizado no servidor."
+            else -> when (remoteMessage.lowercase()) {
             "invalid login credentials" -> "E-mail ou senha inválidos."
             "user already registered" -> "Este e-mail já possui uma conta."
             "email rate limit exceeded" -> "Muitas tentativas. Aguarde um pouco e tente novamente."
             else -> remoteMessage.ifBlank { fallback }
+            }
         }
     }
 
