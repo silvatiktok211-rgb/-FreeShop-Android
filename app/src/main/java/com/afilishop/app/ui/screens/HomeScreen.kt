@@ -143,7 +143,7 @@ fun HomeScreen(
             Surface(Modifier.size(42.dp), CircleShape, colors[i]) { Box(contentAlignment = Alignment.Center) { Icon(link.third, null, tint = if (i == 2) Color(0xFF00A979) else if (i == 3) Color(0xFF8B2BE2) else Orange) } }
             Column(Modifier.padding(start = 8.dp)) { Text(link.first, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(link.second, color = Color(0xFF686A73), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         } }
-    } } }
+    } } } }
 }
 
 @Composable private fun VideoTile(video: SocialVideo, onClick: () -> Unit) {

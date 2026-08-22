@@ -6,7 +6,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Crown
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.*
@@ -20,7 +20,7 @@ fun AfiliBottomBar(selectedRoute: String, onNavigate: (String) -> Unit) {
     val orange = Color(0xFFFF641F)
     val items = listOf(
         Triple("home", "Início", Icons.Default.Home), Triple("videos", "Vídeos", Icons.Default.VideoLibrary),
-        Triple("upload", "Postar", Icons.Default.Add), Triple("vip", "VIP", Icons.Default.Crown),
+        Triple("upload", "Postar", Icons.Default.Add), Triple("vip", "VIP", Icons.Default.WorkspacePremium),
         Triple("account", "Conta", Icons.Default.AccountCircle),
     )
     NavigationBar(containerColor = Color.White, tonalElevation = 5.dp) {
