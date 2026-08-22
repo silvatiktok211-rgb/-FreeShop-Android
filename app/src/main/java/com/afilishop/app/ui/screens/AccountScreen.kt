@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.StarOutline
@@ -63,6 +64,7 @@ fun AccountScreen(
     onFavorites: () -> Unit,
     onPoints: () -> Unit,
     onSettings: () -> Unit,
+    onTerms: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(state.user?.id) {
@@ -232,6 +234,7 @@ fun AccountScreen(
                     AccountMenuItem("Notificações", Icons.Default.NotificationsNone, onNotifications)
                     AccountMenuItem("Comunidade e mensagens", Icons.Default.ChatBubbleOutline, onCommunity)
                     AccountMenuItem("Lives", Icons.Default.LiveTv, onLives)
+                    AccountMenuItem("Termos de Uso", Icons.Default.Gavel, onTerms)
                     AccountMenuItem(
                         title = "Configurações e privacidade",
                         icon = Icons.Default.Settings,

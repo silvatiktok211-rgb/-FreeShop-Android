@@ -31,6 +31,7 @@ import com.afilishop.app.ui.screens.ProfileScreen
 import com.afilishop.app.ui.screens.ResetPasswordScreen
 import com.afilishop.app.ui.screens.SettingsScreen
 import com.afilishop.app.ui.screens.StoreScreen
+import com.afilishop.app.ui.screens.TermsScreen
 import com.afilishop.app.ui.screens.UploadScreen
 import com.afilishop.app.ui.screens.VideosScreen
 import com.afilishop.app.ui.screens.VipAssistantScreen
@@ -136,7 +137,11 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
                     onFavorites = { navController.navigate("favorites") },
                     onPoints = { navController.navigate("points") },
                     onSettings = { navController.navigate("settings") },
+                    onTerms = { navController.navigate("terms") },
                 )
+            }
+            composable("terms") {
+                TermsScreen(padding = padding, onBack = { navController.popBackStack() })
             }
             composable("settings") {
                 SettingsScreen(
