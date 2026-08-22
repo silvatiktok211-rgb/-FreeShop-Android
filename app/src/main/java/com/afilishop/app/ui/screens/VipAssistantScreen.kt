@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.afilishop.app.data.VipAiActionResponse
 import com.afilishop.app.data.VipAiProduct
 import com.afilishop.app.data.VipAiSearchResponse
 import com.afilishop.app.data.VipAssistantRepository
@@ -71,6 +72,13 @@ fun VipAssistantScreen(
     var response by remember { mutableStateOf<VipAiSearchResponse?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var selectedProduct by remember { mutableStateOf<VipAiProduct?>(null) }
+    var productDetail by remember { mutableStateOf<VipAiActionResponse?>(null) }
+    var pendingId by remember { mutableStateOf<String?>(null) }
+    var affiliateUrl by remember { mutableStateOf("") }
+    var affiliateValidated by remember { mutableStateOf(false) }
+    var flowMessage by remember { mutableStateOf<String?>(null) }
+    var publishedSlot by remember { mutableStateOf<Int?>(null) }
 
     DisposableEffect(repository) {
         onDispose { repository.close() }
@@ -87,6 +95,81 @@ fun VipAssistantScreen(
                 .onFailure { error = it.message ?: "Não foi possível pesquisar agora." }
             loading = false
         }
+    }
+
+    fun selectProduct(product: VipAiProduct) {
+        if (loading) return
+        loading = true
+        error = null
+        flowMessage = "Conferindo fotos, descrição e preço…"
+        scope.launch {
+            repository.select(product)
+                .onSuccess { selection ->
+                    val id = selection.pendingId
+                    if (id.isNullOrBlank()) {
+                        error = "A seleção não retornou um identificador válido."
+                    } else {
+                        selectedProduct = product
+                        pendingId = id
+                        repository.detail(product.id, id)
+                            .onSuccess { detail ->
+                                productDetail = detail
+                                flowMessage = "Produto confirmado. Cole o link de afiliado deste mesmo produto."
+                            }
+                            .onFailure { error = it.message ?: "Não consegui carregar os detalhes do produto." }
+                    }
+                }
+                .onFailure { error = it.message ?: "Não consegui selecionar o produto." }
+            loading = false
+        }
+    }
+
+    fun validateAffiliate() {
+        val id = pendingId ?: return
+        if (affiliateUrl.trim().length < 8 || loading) return
+        loading = true
+        error = null
+        scope.launch {
+            repository.validate(id, affiliateUrl.trim())
+                .onSuccess {
+                    affiliateValidated = true
+                    flowMessage = it.message ?: "Link validado. Produto pronto para publicar."
+                }
+                .onFailure { error = it.message ?: "Não consegui validar o link de afiliado." }
+            loading = false
+        }
+    }
+
+    fun publishProduct() {
+        val id = pendingId ?: return
+        if (!affiliateValidated || loading) return
+        loading = true
+        error = null
+        flowMessage = "Publicando na sua vitrine…"
+        scope.launch {
+            repository.publish(id, affiliateUrl.trim())
+                .onSuccess {
+                    publishedSlot = it.slot
+                    flowMessage = "Produto publicado com sucesso no slot ${it.slot ?: ""}."
+                    selectedProduct = null
+                    productDetail = null
+                    pendingId = null
+                    affiliateUrl = ""
+                    affiliateValidated = false
+                    response = null
+                }
+                .onFailure { error = it.message ?: "Não foi possível publicar o produto." }
+            loading = false
+        }
+    }
+
+    fun resetFlow() {
+        selectedProduct = null
+        productDetail = null
+        pendingId = null
+        affiliateUrl = ""
+        affiliateValidated = false
+        flowMessage = null
     }
 
     Scaffold(
@@ -230,7 +313,65 @@ fun VipAssistantScreen(
                             }
                         }
                     },
+                    onSelect = { selectProduct(product) },
                 )
+            }
+
+            selectedProduct?.let { product ->
+                item {
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Produto selecionado", fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge)
+                            Text(productDetail?.title ?: product.title, fontWeight = FontWeight.Bold)
+                            val confirmedPrice = productDetail?.price?.takeIf { it > 0 } ?: product.price
+                            Text(currency.format(confirmedPrice), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
+                            productDetail?.description?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                            }
+                            productDetail?.images.orEmpty().firstOrNull()?.let { image ->
+                                AsyncImage(
+                                    model = image,
+                                    contentDescription = product.title,
+                                    modifier = Modifier.fillMaxWidth().height(210.dp),
+                                    contentScale = ContentScale.Fit,
+                                )
+                            }
+                            OutlinedTextField(
+                                value = affiliateUrl,
+                                onValueChange = {
+                                    affiliateUrl = it.take(2048)
+                                    affiliateValidated = false
+                                },
+                                label = { Text("Link de afiliado deste produto") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { resetFlow() }, modifier = Modifier.weight(1f)) { Text("Voltar") }
+                                if (affiliateValidated) {
+                                    Button(onClick = { publishProduct() }, enabled = !loading, modifier = Modifier.weight(1f)) { Text("Publicar") }
+                                } else {
+                                    Button(
+                                        onClick = { validateAffiliate() },
+                                        enabled = affiliateUrl.trim().length >= 8 && !loading,
+                                        modifier = Modifier.weight(1f),
+                                    ) { Text("Validar") }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            flowMessage?.let { message ->
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF8EE)), modifier = Modifier.fillMaxWidth()) {
+                        Text(message, modifier = Modifier.padding(14.dp), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            publishedSlot?.let { slot ->
+                item { Text("✅ Publicado no slot $slot", color = Color(0xFF15803D), fontWeight = FontWeight.Black) }
             }
         }
     }
@@ -241,6 +382,7 @@ private fun VipResultCard(
     product: VipAiProduct,
     currency: NumberFormat,
     onOpen: () -> Unit,
+    onSelect: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
         Column(Modifier.padding(14.dp)) {
@@ -302,10 +444,13 @@ private fun VipResultCard(
                 )
             }
 
-            Button(
+            Button(onClick = onSelect, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                Text("Selecionar produto")
+            }
+            OutlinedButton(
                 onClick = onOpen,
                 enabled = !product.permalink.isNullOrBlank(),
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             ) {
                 Icon(Icons.Default.OpenInNew, null)
                 Text("Ver anúncio", modifier = Modifier.padding(start = 6.dp))
