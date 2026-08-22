@@ -63,6 +63,17 @@ import kotlinx.coroutines.launch
 
 private const val EXTRA_SEARCH_PRICE_BRL = 3.0
 
+private fun formatFeatureLimit(name: String, value: Int?, period: String?): String {
+    if (value == null) return name
+    val suffix = when (period) {
+        "day" -> "/dia"
+        "week" -> "/semana"
+        "month" -> "/mês"
+        else -> ""
+    }
+    return "$name: $value$suffix"
+}
+
 private fun formatPlanExpiry(value: String?): String {
     if (value.isNullOrBlank()) return "Sem vencimento"
     return runCatching {
@@ -129,6 +140,7 @@ fun VipScreen(
 
     val plans = state.plans
     val paidPlans = plans.filter { it.code != "free" && it.priceBrl > 0 }
+    val planFeatures = state.planFeatures
     val subscription = state.subscription
     val baseLimit = subscription?.slotsTotal ?: plans.firstOrNull { it.tier == (subscription?.tier ?: 0) }?.slots ?: 0
     val normalRemaining = max(baseLimit - vipStatus.usedToday, 0)
@@ -341,6 +353,10 @@ fun VipScreen(
                     billingMessage = state.billingMessage,
                     playPrice = PlayBillingSkus.forPlanCode(plan.code)?.let(playPrices::get)?.takeIf { it.isNotBlank() },
                     expiresAt = if (isCurrent) subscription?.expiresAt else null,
+                    featureBenefits = planFeatures
+                        .filter { it.minTier <= plan.tier }
+                        .sortedWith(compareBy({ it.sortOrder }, { it.key }))
+                        .map { formatFeatureLimit(it.name, it.limitValue, it.limitPeriod) },
                 )
             }
         }
@@ -359,6 +375,7 @@ private fun PlanCard(
     billingMessage: String?,
     playPrice: String?,
     expiresAt: String?,
+    featureBenefits: List<String>,
 ) {
     val formatter = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -385,7 +402,7 @@ private fun PlanCard(
                 )
             }
 
-            plan.benefits.take(3).forEach { benefit ->
+            (featureBenefits.ifEmpty { plan.benefits }).take(3).forEach { benefit ->
                 RowBenefit(benefit)
             }
 
