@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +80,12 @@ fun VipAssistantScreen(
     var affiliateValidated by remember { mutableStateOf(false) }
     var flowMessage by remember { mutableStateOf<String?>(null) }
     var publishedSlot by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(Unit) {
+        repository.usage().onSuccess { usageResponse ->
+            response = VipAiSearchResponse(ok = true, usage = usageResponse.usage)
+        }
+    }
 
     DisposableEffect(repository) {
         onDispose { repository.close() }
@@ -159,6 +166,22 @@ fun VipAssistantScreen(
                     response = null
                 }
                 .onFailure { error = it.message ?: "Não foi possível publicar o produto." }
+            loading = false
+        }
+    }
+
+    fun deleteLastPublication() {
+        val slot = publishedSlot ?: return
+        if (loading) return
+        loading = true
+        error = null
+        scope.launch {
+            repository.delete(slot)
+                .onSuccess {
+                    publishedSlot = null
+                    flowMessage = "Publicação removida da sua vitrine."
+                }
+                .onFailure { error = it.message ?: "Não foi possível excluir a publicação." }
             loading = false
         }
     }
@@ -371,7 +394,16 @@ fun VipAssistantScreen(
             }
 
             publishedSlot?.let { slot ->
-                item { Text("✅ Publicado no slot $slot", color = Color(0xFF15803D), fontWeight = FontWeight.Black) }
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF8EE)), modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("✅ Publicado no slot $slot", color = Color(0xFF15803D), fontWeight = FontWeight.Black)
+                            OutlinedButton(onClick = { deleteLastPublication() }, enabled = !loading) {
+                                Text("Excluir publicação")
+                            }
+                        }
+                    }
+                }
             }
         }
     }
