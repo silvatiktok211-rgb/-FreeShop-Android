@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.afilishop.app.data.PlayBillingManager
+import com.afilishop.app.data.PlayBillingSkus
 import com.afilishop.app.data.VipStatusRepository
 import com.afilishop.app.data.VipStatusSnapshot
 import com.afilishop.app.model.SubscriptionPlan
@@ -51,7 +52,6 @@ import java.util.Locale
 import kotlin.math.max
 import kotlinx.coroutines.launch
 
-private const val FALLBACK_SKU = "professional_monthly"
 private const val EXTRA_SEARCH_PRICE_BRL = 3.0
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,7 +87,7 @@ fun VipScreen(
     }
     LaunchedEffect(manager, state.plans) {
         manager.querySubscriptions(
-            state.plans.filter { it.priceBrl > 0 }.map { it.code }.ifEmpty { listOf(FALLBACK_SKU) },
+            state.plans.filter { it.priceBrl > 0 }.mapNotNull { PlayBillingSkus.forPlanCode(it.code) }.ifEmpty { PlayBillingSkus.all },
         ) { details -> availableSkus = details.map { it.productId }.toSet() }
     }
     DisposableEffect(manager, statusRepository) {
@@ -271,7 +271,7 @@ fun VipScreen(
                     loggedIn = state.user != null,
                     isCurrent = isCurrent,
                     activity = activity,
-                    available = availableSkus.contains(plan.code),
+                    available = PlayBillingSkus.forPlanCode(plan.code)?.let(availableSkus::contains) == true,
                     manager = manager,
                     onLogin = onLogin,
                     billingMessage = state.billingMessage,
@@ -327,7 +327,7 @@ private fun PlanCard(
 
                 else -> Button(
                     onClick = {
-                        if (activity != null && available) manager.launchSubscription(activity, plan.code)
+                        if (activity != null && available) PlayBillingSkus.forPlanCode(plan.code)?.let { manager.launchSubscription(activity, it) }
                     },
                     enabled = available,
                     modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
