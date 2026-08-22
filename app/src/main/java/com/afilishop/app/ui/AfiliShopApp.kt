@@ -89,7 +89,14 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
             modifier = Modifier.fillMaxSize(),
         ) {
             composable("home") {
-                HomeScreen(viewModel, padding, onProduct = { navController.navigate("product/$it") })
+                HomeScreen(
+                    viewModel = viewModel,
+                    padding = padding,
+                    onProduct = { navController.navigate("product/$it") },
+                    onSearch = { navController.navigate("explore") },
+                    onNotifications = { navController.navigate("notifications") },
+                    onVideos = { navController.navigate("videos") },
+                )
             }
             composable("explore") {
                 ExploreScreen(viewModel, padding, onProduct = { navController.navigate("product/$it") })
