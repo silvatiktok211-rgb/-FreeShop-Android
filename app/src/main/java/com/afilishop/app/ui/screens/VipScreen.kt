@@ -55,11 +55,20 @@ import com.afilishop.app.data.VipStatusSnapshot
 import com.afilishop.app.model.SubscriptionPlan
 import com.afilishop.app.ui.AfiliShopViewModel
 import java.text.NumberFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.max
 import kotlinx.coroutines.launch
 
 private const val EXTRA_SEARCH_PRICE_BRL = 3.0
+
+private fun formatPlanExpiry(value: String?): String {
+    if (value.isNullOrBlank()) return "Sem vencimento"
+    return runCatching {
+        LocalDate.parse(value.take(10)).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+    }.getOrDefault("Vencimento indisponível")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -331,6 +340,7 @@ fun VipScreen(
                     onLogin = onLogin,
                     billingMessage = state.billingMessage,
                     playPrice = PlayBillingSkus.forPlanCode(plan.code)?.let(playPrices::get)?.takeIf { it.isNotBlank() },
+                    expiresAt = if (isCurrent) subscription?.expiresAt else null,
                 )
             }
         }
@@ -348,6 +358,7 @@ private fun PlanCard(
     onLogin: () -> Unit,
     billingMessage: String?,
     playPrice: String?,
+    expiresAt: String?,
 ) {
     val formatter = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -363,6 +374,16 @@ private fun PlanCard(
                 "${plan.slots} produtos ativos • ${plan.slots} buscas de IA por dia${plan.durationDays?.let { " • $it dias" } ?: ""}",
                 style = MaterialTheme.typography.labelMedium,
             )
+
+            if (isCurrent) {
+                Text(
+                    "Ativo • vence em ${formatPlanExpiry(expiresAt)}",
+                    color = Color(0xFF16A34A),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
 
             plan.benefits.take(3).forEach { benefit ->
                 RowBenefit(benefit)
