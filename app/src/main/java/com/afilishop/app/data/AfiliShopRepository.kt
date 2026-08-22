@@ -31,6 +31,7 @@ import com.afilishop.app.model.RankingEntry
 import com.afilishop.app.model.SocialVideoInsert
 import com.afilishop.app.model.Store
 import com.afilishop.app.model.SubscriptionPlan
+import com.afilishop.app.model.PlanFeature
 import com.afilishop.app.model.VideoComment
 import com.afilishop.app.model.VideoCommentInsert
 import com.afilishop.app.model.VideoLikeRow
@@ -259,7 +260,21 @@ class AfiliShopRepository(context: Context) {
 
     suspend fun loadPlans(): List<SubscriptionPlan> {
         if (!configured) return emptyList()
-        return runCatching { getTable<SubscriptionPlan>("subscription_plans", mapOf("select" to "id,code,name,price_brl,slots,tier,duration_days,is_active", "is_active" to "eq.true", "order" to "sort_order.asc")) }.getOrElse { emptyList() }
+        return runCatching { getTable<SubscriptionPlan>("subscription_plans", mapOf("select" to "id,code,name,price_brl,slots,tier,duration_days,is_active,benefits", "is_active" to "eq.true", "order" to "sort_order.asc")) }.getOrElse { emptyList() }
+    }
+
+    suspend fun loadPlanFeatures(): List<PlanFeature> {
+        if (!configured) return emptyList()
+        return runCatching {
+            getTable<PlanFeature>(
+                "plan_features",
+                mapOf(
+                    "select" to "key,name,min_tier,limit_value,limit_period,sort_order,is_active",
+                    "is_active" to "eq.true",
+                    "order" to "sort_order.asc",
+                ),
+            )
+        }.getOrElse { emptyList() }
     }
 
     suspend fun listProductComments(productId: String): List<ProductComment> {
@@ -457,7 +472,7 @@ class AfiliShopRepository(context: Context) {
 
     suspend fun loadSubscription(userId: String): UserSubscription? {
         if (!configured || userId.isBlank()) return null
-        return runCatching { getTable<UserSubscription>("user_subscriptions", mapOf("select" to "tier,status,expires_at,slots_total,slots_used", "user_id" to "eq.$userId", "limit" to "1")).firstOrNull() }.getOrNull()
+        return runCatching { getTable<UserSubscription>("user_subscriptions", mapOf("select" to "plan_id,tier,status,expires_at,slots_total,slots_used", "user_id" to "eq.$userId", "limit" to "1")).firstOrNull() }.getOrNull()
     }
 
     private suspend fun deleteTable(table: String, params: Map<String, String>): Boolean {
