@@ -15,7 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Crown
+import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
@@ -58,7 +58,7 @@ fun ProductCard(
         tier == 1 -> "Destaque"
         else -> null
     }
-    val badgeIcon = if (tier >= 3) Icons.Default.Crown else Icons.Default.AutoAwesome
+    val badgeIcon = if (tier >= 3) Icons.Default.Stars else Icons.Default.AutoAwesome
 
     Card(
         onClick = onClick,
