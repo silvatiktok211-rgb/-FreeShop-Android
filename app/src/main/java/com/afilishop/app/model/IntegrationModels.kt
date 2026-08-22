@@ -222,7 +222,8 @@ data class SubscriptionPlan(
     val slots: Int = 0,
     val tier: Int = 0,
     @SerialName("duration_days") val durationDays: Int? = null,
-    @SerialName("is_active") val isActive: Boolean = true
+    @SerialName("is_active") val isActive: Boolean = true,
+    val benefits: List<String> = emptyList()
 )
 
 @Serializable
