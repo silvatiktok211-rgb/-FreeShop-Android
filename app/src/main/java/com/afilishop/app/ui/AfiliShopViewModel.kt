@@ -15,6 +15,7 @@ import com.afilishop.app.model.ProfileUpdatePayload
 import com.afilishop.app.model.SocialVideoInsert
 import com.afilishop.app.model.Store
 import com.afilishop.app.model.SubscriptionPlan
+import com.afilishop.app.model.PlanFeature
 import com.afilishop.app.model.VideoComment
 import com.afilishop.app.model.AdminActionRequest
 import com.afilishop.app.model.AdminResponse
@@ -54,6 +55,7 @@ data class AfiliShopUiState(
     val productOffers: List<ProductOffer> = emptyList(),
     val priceHistory: List<PricePoint> = emptyList(),
     val plans: List<SubscriptionPlan> = emptyList(),
+    val planFeatures: List<PlanFeature> = emptyList(),
     val productComments: List<ProductComment> = emptyList(),
     val videoComments: List<VideoComment> = emptyList(),
     val error: String? = null,
@@ -341,7 +343,11 @@ class AfiliShopViewModel(private val repository: AfiliShopRepository) : ViewMode
     }
 
     fun loadPlans() {
-        viewModelScope.launch { _uiState.update { it.copy(plans = repository.loadPlans()) } }
+        viewModelScope.launch {
+            val plans = repository.loadPlans()
+            val features = repository.loadPlanFeatures()
+            _uiState.update { it.copy(plans = plans, planFeatures = features) }
+        }
     }
 
     fun activatePlayBilling(sku: String, purchaseToken: String, acknowledge: () -> Unit) {
