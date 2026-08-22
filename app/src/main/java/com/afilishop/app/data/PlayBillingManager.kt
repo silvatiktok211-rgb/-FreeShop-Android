@@ -9,6 +9,7 @@ import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.QueryProductDetailsParams
+import com.android.billingclient.api.QueryPurchasesParams
 
 object PlayBillingSkus {
     private val byPlanCode = mapOf(
@@ -28,16 +29,22 @@ class PlayBillingManager(
 ) {
     private val client = BillingClient.newBuilder(context)
         .setListener { result, purchases ->
-            if (result.responseCode == BillingResponseCode.OK) {
-                purchases.orEmpty().filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }.forEach { purchase ->
-                    purchase.products.forEach { sku -> onPurchaseToken(sku, purchase.purchaseToken) { acknowledge(purchase.purchaseToken) } }
-                }
-            }
+            if (result.responseCode == BillingResponseCode.OK) handlePurchases(purchases.orEmpty())
         }
         .enablePendingPurchases()
         .build()
 
     private val productCache = mutableMapOf<String, ProductDetails>()
+
+    private fun handlePurchases(purchases: List<Purchase>) {
+        purchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }.forEach { purchase ->
+            purchase.products.forEach { sku ->
+                onPurchaseToken(sku, purchase.purchaseToken) {
+                    if (!purchase.isAcknowledged) acknowledge(purchase.purchaseToken)
+                }
+            }
+        }
+    }
 
     fun connect(onReady: (Boolean) -> Unit = {}) {
         if (client.isReady) { onReady(true); return }
@@ -58,6 +65,19 @@ class PlayBillingManager(
                     details.forEach { productCache[it.productId] = it }
                     onComplete(details)
                 } else onComplete(emptyList())
+            }
+        }
+    }
+
+    fun restorePurchases(onComplete: () -> Unit = {}) {
+        connect { ready ->
+            if (!ready) { onComplete(); return@connect }
+            val params = QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.SUBS)
+                .build()
+            client.queryPurchasesAsync(params) { result, purchases ->
+                if (result.responseCode == BillingResponseCode.OK) handlePurchases(purchases)
+                onComplete()
             }
         }
     }
