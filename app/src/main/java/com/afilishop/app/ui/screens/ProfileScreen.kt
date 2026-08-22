@@ -20,10 +20,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.NotificationsNone
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -64,8 +63,7 @@ fun ProfileScreen(
     viewModel: AfiliShopViewModel,
     padding: PaddingValues,
     onUpload: () -> Unit,
-    onSettings: (() -> Unit)? = null,
-    onNotifications: (() -> Unit)? = null,
+    onBack: () -> Unit,
     publicUserId: String? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -120,16 +118,9 @@ fun ProfileScreen(
                         fontWeight = FontWeight.Bold,
                     )
                 },
-                actions = {
-                    if (isOwn && onNotifications != null) {
-                        IconButton(onClick = onNotifications) {
-                            Icon(Icons.Default.NotificationsNone, "Notificações")
-                        }
-                    }
-                    if (isOwn && onSettings != null) {
-                        IconButton(onClick = onSettings) {
-                            Icon(Icons.Default.Settings, "Configurações")
-                        }
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, "Voltar")
                     }
                 },
             )

@@ -71,7 +71,9 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val premium = state.home.products.filter { (it.priorityTier ?: 0) > 0 }.ifEmpty { state.home.products }.take(8)
+    val premium = state.home.premiumProducts.ifEmpty {
+        state.home.products.filter { (it.priorityTier ?: 0) > 0 }.ifEmpty { state.home.products }
+    }
     Column(Modifier.fillMaxSize().padding(padding).background(Page)) {
         HomeHeader(onSearch, onNotifications, state.notifications.count { !it.isRead })
         LazyVerticalGrid(
@@ -103,9 +105,10 @@ fun HomeScreen(
                         SectionHeader("♛  Produtos Premium", "Ver todos", "Produtos publicados por afiliados VIP")
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(premium, key = { it.id }) { p -> Box(Modifier.width(168.dp)) {
-                                ProductCard(p, { onProduct(p.id) }, favorite = p.id in state.favoriteIds,
+                                val openOffer = { openProduct(p, viewModel, context, onProduct) }
+                                ProductCard(p, openOffer, favorite = p.id in state.favoriteIds,
                                     onFavorite = if (state.user != null) ({ viewModel.toggleFavorite(p.id) }) else null,
-                                    onBuy = { openProduct(p, viewModel, context, onProduct) })
+                                    onBuy = openOffer)
                             } }
                         }
                     }
@@ -236,7 +239,7 @@ private fun CatalogStatus(loading: Boolean, message: String?, onRetry: () -> Uni
 
 @Composable private fun VideoTile(video: SocialVideo, onClick: () -> Unit) {
     Card(Modifier.width(130.dp).height(202.dp).clickable(onClick = onClick), RoundedCornerShape(20.dp)) { Box(Modifier.fillMaxSize()) {
-        AsyncImage(video.thumbnailUrl ?: video.productImage, video.caption, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        AsyncImage(video.thumbnailUrl ?: video.productImage ?: video.videoUrl, video.caption, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         Surface(Modifier.align(Alignment.TopStart).padding(7.dp), CircleShape, Color.Black.copy(alpha = .68f)) { Text("▶ ${views(video.viewsCount)}", color = Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)) }
         Surface(Modifier.align(Alignment.Center), CircleShape, Color.White.copy(alpha = .9f)) { Icon(Icons.Default.PlayArrow, "Reproduzir", Modifier.padding(11.dp).size(24.dp), tint = Orange) }
         Text("@${video.profile?.displayName ?: "Afilishopp"}  ✓", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1, modifier = Modifier.align(Alignment.BottomStart).padding(9.dp))

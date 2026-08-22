@@ -62,6 +62,7 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
     val bottomRoutes = setOf("home", "videos", "upload", "vip", "account")
     val hideOverlays = currentRoute.startsWith("videos") ||
         currentRoute.startsWith("conversation/") ||
+        currentRoute.startsWith("account/") ||
         currentRoute == "upload" ||
         currentRoute == "login" ||
         currentRoute == "reset-password"
@@ -187,26 +188,26 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
                     viewModel = viewModel,
                     padding = padding,
                     onLogin = { navController.navigate("login") },
-                    onProfile = { navController.navigate("profile") },
+                    onProfile = { navController.navigate("account/profile") },
                     onNotifications = { navController.navigate("notifications") },
                     onCommunity = { navController.navigate("community") },
                     onLives = { navController.navigate("lives") },
                     onAdmin = { navController.navigate("admin") },
                     onFavorites = { navController.navigate("favorites") },
                     onPoints = { navController.navigate("points") },
-                    onSettings = { navController.navigate("settings") },
+                    onSettings = { navController.navigate("account/settings") },
                     onTerms = { navController.navigate("terms") },
                 )
             }
             composable("terms") {
                 TermsScreen(padding = padding, onBack = { navController.popBackStack() })
             }
-            composable("settings") {
+            composable("account/settings") {
                 SettingsScreen(
                     viewModel = viewModel,
                     padding = padding,
                     onBack = { navController.popBackStack() },
-                    onProfile = { navController.navigate("profile") },
+                    onProfile = { navController.navigate("account/profile") },
                     onLives = { navController.navigate("lives") },
                     onSignedOut = {
                         navController.navigate("home") {
@@ -276,13 +277,12 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
                     onProduct = { navController.navigate("product/$it") },
                 )
             }
-            composable("profile") {
+            composable("account/profile") {
                 ProfileScreen(
                     viewModel = viewModel,
                     padding = padding,
                     onUpload = { navController.navigate("upload") },
-                    onSettings = { navController.navigate("settings") },
-                    onNotifications = { navController.navigate("notifications") },
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(
@@ -293,6 +293,7 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
                     viewModel = viewModel,
                     padding = padding,
                     onUpload = {},
+                    onBack = { navController.popBackStack() },
                     publicUserId = entry.arguments?.getString("userId"),
                 )
             }
@@ -327,7 +328,6 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
                     onPostVideo = { navController.navigate("upload") },
                     onLive = { navController.navigate("lives") },
                     onCommunity = { navController.navigate("community") },
-                    onSettings = { navController.navigate("settings") },
                     onSupport = { navController.navigate(if (state.user == null) "login" else "account") },
                 )
             }

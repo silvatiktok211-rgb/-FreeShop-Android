@@ -29,28 +29,37 @@ class ProductSearchRepository {
         expectSuccess = false
     }
 
-    suspend fun search(query: String, categoryId: String? = null, limit: Int = 60): List<Product> {
+    suspend fun search(query: String, categoryId: String? = null): List<Product> {
         if (!configured) return emptyList()
 
         return runCatching {
-            val response = client.get("$supabaseUrl/rest/v1/products") {
-                header("apikey", anonKey)
-                url.parameters.append(
-                    "select",
-                    "id,title,price,currency,image_url,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id,created_at",
-                )
-                query.trim().takeIf { it.isNotBlank() }?.let {
-                    url.parameters.append("title", "ilike.*$it*")
+            val products = mutableListOf<Product>()
+            var offset = 0
+            val pageSize = 200
+            while (true) {
+                val response = client.get("$supabaseUrl/rest/v1/products") {
+                    header("apikey", anonKey)
+                    url.parameters.append(
+                        "select",
+                        "id,title,price,currency,image_url,images,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id,created_at",
+                    )
+                    query.trim().takeIf { it.isNotBlank() }?.let {
+                        url.parameters.append("title", "ilike.*$it*")
+                    }
+                    categoryId?.takeIf { it.isNotBlank() }?.let {
+                        url.parameters.append("category_id", "eq.$it")
+                    }
+                    url.parameters.append("order", "priority_tier.desc,created_at.desc")
+                    url.parameters.append("limit", pageSize.toString())
+                    url.parameters.append("offset", offset.toString())
                 }
-                categoryId?.takeIf { it.isNotBlank() }?.let {
-                    url.parameters.append("category_id", "eq.$it")
-                }
-                url.parameters.append("order", "priority_tier.desc,created_at.desc")
-                url.parameters.append("limit", limit.coerceIn(1, 100).toString())
+                if (response.status.value !in 200..299) error("Catálogo indisponível (${response.status.value}).")
+                val page = response.body<List<Product>>()
+                products += page
+                if (page.size < pageSize) break
+                offset += page.size
             }
-
-            if (response.status.value !in 200..299) return@runCatching emptyList()
-            response.body<List<Product>>()
+            products
         }.getOrElse { emptyList() }
     }
 

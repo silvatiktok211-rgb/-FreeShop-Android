@@ -28,6 +28,14 @@ class NotificationRoutesTest {
     }
 
     @Test
+    fun keepsOwnProfileAndSettingsInsideAccount() {
+        assertEquals("account/profile", notificationDestination("/perfil"))
+        assertEquals("account/settings", notificationDestination("/configuracoes"))
+        assertEquals("account/settings", notificationDestination("/conta/configuracoes"))
+        assertEquals("profile/criador-1", notificationDestination("/perfil/criador-1"))
+    }
+
+    @Test
     fun leavesUnknownExternalDestinationForTheBrowser() {
         assertNull(notificationDestination("https://example.com/oferta"))
     }

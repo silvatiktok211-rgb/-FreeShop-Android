@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.HeadsetMic
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
@@ -62,7 +61,6 @@ fun AfiliFloatingActions(
     onPostVideo: () -> Unit,
     onLive: () -> Unit,
     onCommunity: () -> Unit,
-    onSettings: () -> Unit,
     onSupport: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -75,7 +73,6 @@ fun AfiliFloatingActions(
         FloatingDestination("Postar vídeo", Icons.Default.Videocam, onPostVideo),
         FloatingDestination("Iniciar live", Icons.Default.LiveTv, onLive),
         FloatingDestination("Comunidade", Icons.Default.People, onCommunity),
-        FloatingDestination("Configurações", Icons.Default.Settings, onSettings),
         FloatingDestination("Suporte", Icons.Default.HeadsetMic, onSupport),
     )
 

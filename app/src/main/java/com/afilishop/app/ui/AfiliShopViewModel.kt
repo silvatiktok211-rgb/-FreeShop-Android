@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.time.Instant
 
@@ -112,8 +113,10 @@ class AfiliShopViewModel(private val repository: AfiliShopRepository) : ViewMode
     fun refresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val videos = repository.loadVideos()
-            runCatching { repository.loadHome() }
+            val homeRequest = async { runCatching { repository.loadHome() } }
+            val videosRequest = async { repository.loadVideos() }
+            val videos = videosRequest.await()
+            homeRequest.await()
                 .onSuccess { home ->
                     _uiState.update { it.copy(isLoading = false, home = home, videos = videos, error = null) }
                 }

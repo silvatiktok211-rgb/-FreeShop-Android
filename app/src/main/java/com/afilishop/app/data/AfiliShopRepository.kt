@@ -48,6 +48,7 @@ import com.afilishop.app.model.Banner
 import com.afilishop.app.model.Category
 import com.afilishop.app.model.HomePayload
 import com.afilishop.app.model.Product
+import com.afilishop.app.model.PremiumProductRow
 import com.afilishop.app.model.Profile
 import com.afilishop.app.model.SignInRequest
 import com.afilishop.app.model.SignUpRequest
@@ -74,6 +75,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
 
@@ -126,31 +129,51 @@ class AfiliShopRepository(context: Context) {
 
     suspend fun loadHome(): HomePayload {
         if (!configured) return HomePayload()
-        // The storefront is public on the website as well. This request intentionally
-        // works with only the anon key when there is no authenticated session.
-        val products = getTable<Product>("products", mapOf(
-            "select" to "id,title,price,currency,image_url,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id",
-            "order" to "priority_tier.desc,created_at.desc",
-            "limit" to "120"
-        ))
-        val categories = runCatching {
-            getTable<Category>("categories", mapOf("select" to "id,name,slug,icon", "order" to "name.asc"))
-        }.getOrElse { emptyList() }
-        val banners = runCatching {
-            getTable<Banner>("banners", mapOf("select" to "id,type,media_url,title,subtitle,link_url", "is_active" to "eq.true", "order" to "sort_order.asc"))
-        }.getOrElse { emptyList() }
-        return HomePayload(products, categories, banners)
+        // The storefront is public on the website as well. These requests intentionally
+        // work with only the anon key when there is no authenticated session.
+        return coroutineScope {
+            val products = async {
+                getAllTable<Product>("products", mapOf(
+                    "select" to "id,title,price,currency,image_url,images,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id,created_at",
+                    "order" to "priority_tier.desc,created_at.desc",
+                ))
+            }
+            val categories = async {
+                runCatching {
+                    getTable<Category>("categories", mapOf("select" to "id,name,slug,icon", "order" to "name.asc"))
+                }.getOrElse { emptyList() }
+            }
+            val banners = async {
+                runCatching {
+                    getTable<Banner>("banners", mapOf("select" to "id,type,media_url,title,subtitle,link_url", "is_active" to "eq.true", "order" to "sort_order.asc"))
+                }.getOrElse { emptyList() }
+            }
+            val premiumProducts = async {
+                runCatching {
+                    getAllTable<PremiumProductRow>("ml_products", mapOf(
+                        "select" to "id,ml_item_id,affiliate_link,original_affiliate_url,title,current_price,original_price,discount_percentage,thumbnail,images,user_id,availability",
+                        "availability" to "eq.true",
+                        "order" to "last_updated.desc",
+                    )).map(PremiumProductRow::toProduct)
+                }.getOrElse { emptyList() }
+            }
+            HomePayload(
+                products = products.await(),
+                categories = categories.await(),
+                banners = banners.await(),
+                premiumProducts = premiumProducts.await(),
+            )
+        }
     }
 
     suspend fun loadProductsByCategory(categoryId: String): List<Product> {
         if (categoryId.isBlank()) return loadHome().products
         if (!configured) return DemoData.home.products.filter { it.categoryId == categoryId }
         return runCatching {
-            getTable<Product>("products", mapOf(
-                "select" to "id,title,price,currency,image_url,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id",
+            getAllTable<Product>("products", mapOf(
+                "select" to "id,title,price,currency,image_url,images,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id,created_at",
                 "category_id" to "eq.$categoryId",
                 "order" to "priority_tier.desc,created_at.desc",
-                "limit" to "1000"
             ))
         }.getOrElse { emptyList() }
     }
@@ -159,11 +182,10 @@ class AfiliShopRepository(context: Context) {
         if (query.isBlank()) return loadHome().products
         if (!configured) return DemoData.home.products.filter { it.title.contains(query, ignoreCase = true) }
         return runCatching {
-            getTable<Product>("products", mapOf(
-                "select" to "id,title,price,currency,image_url,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url",
+            getAllTable<Product>("products", mapOf(
+                "select" to "id,title,price,currency,image_url,images,old_price,discount_percentage,free_shipping,affiliate_url,original_affiliate_url,priority_tier,category_id,created_at",
                 "title" to "ilike.*${query.trim()}*",
                 "order" to "created_at.desc",
-                "limit" to "60"
             ))
         }.getOrElse { emptyList() }
     }
@@ -182,13 +204,27 @@ class AfiliShopRepository(context: Context) {
     suspend fun loadVideos(): List<SocialVideo> {
         if (!configured) return emptyList()
         return runCatching {
-            getTable<SocialVideo>("social_videos", mapOf(
-                "select" to "id,video_url,thumbnail_url,description,product_id,user_id,likes_count,comments_count,created_at",
-                "is_published" to "eq.true",
+            val videos = getAllTable<SocialVideo>("social_videos", mapOf(
+                "select" to "id,video_url,thumbnail_url,description,is_active,is_featured,product_id,product_external_url,product_title,product_price,product_image,shares_count,views_count,user_id,likes_count,comments_count,created_at",
+                "is_active" to "eq.true",
                 "order" to "created_at.desc",
-                "limit" to "40"
             ))
+            attachVideoProfiles(videos)
         }.getOrElse { emptyList() }
+    }
+
+    private suspend fun attachVideoProfiles(videos: List<SocialVideo>): List<SocialVideo> {
+        val userIds = videos.mapNotNull(SocialVideo::userId).distinct()
+        if (userIds.isEmpty()) return videos
+        val profiles = userIds.chunked(50).flatMap { batch ->
+            runCatching {
+                getTable<Profile>("profiles", mapOf(
+                    "select" to "id,display_name,avatar_url,bio,followers_count,following_count",
+                    "id" to "in.(${batch.joinToString(",")})",
+                ))
+            }.getOrElse { emptyList() }
+        }.associateBy(Profile::id)
+        return videos.map { video -> video.copy(profile = video.userId?.let(profiles::get)) }
     }
 
     suspend fun signIn(email: String, password: String): Result<AuthSession> = runCatching {
@@ -658,6 +694,30 @@ class AfiliShopRepository(context: Context) {
         }
         if (response.status.value !in 200..299) error("Supabase ${response.status.value}")
         return response.body()
+    }
+
+    private suspend inline fun <reified T> getAllTable(
+        table: String,
+        params: Map<String, String>,
+        pageSize: Int = 200,
+    ): List<T> {
+        val safePageSize = pageSize.coerceIn(1, 1000)
+        val baseParams = params - "limit" - "offset"
+        val items = mutableListOf<T>()
+        var offset = 0
+        while (true) {
+            val page = getTable<T>(
+                table,
+                baseParams + mapOf(
+                    "limit" to safePageSize.toString(),
+                    "offset" to offset.toString(),
+                ),
+            )
+            items += page
+            if (page.size < safePageSize) break
+            offset += page.size
+        }
+        return items
     }
 }
 

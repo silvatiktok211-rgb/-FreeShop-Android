@@ -21,16 +21,20 @@ fun notificationDestination(rawLink: String?): String? {
         "mensagens", "mensagem", "conversation" -> id?.let { "conversation/$it" } ?: "community"
         "notificacoes", "notificações", "notifications" -> "notifications"
         "videos", "vídeos" -> "videos"
-        "perfil", "profile" -> id?.let { "profile/$it" } ?: "profile"
+        "perfil", "profile" -> id?.let { "profile/$it" } ?: "account/profile"
         "loja", "store" -> id?.let { "store/$it" } ?: "explore"
         "busca", "buscar", "explorar", "explore", "search" -> "explore"
-        "conta", "account" -> "account"
+        "conta", "account" -> when (id?.lowercase()) {
+            "configuracoes", "configurações", "settings" -> "account/settings"
+            "perfil", "profile" -> "account/profile"
+            else -> "account"
+        }
         "comunidade", "community" -> "community"
         "lives", "live", "ao-vivo" -> "lives"
         "planos", "vip", "dashboard-vip" -> "vip"
         "assistente-vip", "vip-assistant" -> "vip-assistant"
         "postar", "publicar", "upload" -> "upload"
-        "configuracoes", "configurações", "settings" -> "settings"
+        "configuracoes", "configurações", "settings" -> "account/settings"
         "termos", "terms" -> "terms"
         "admin" -> "admin"
         else -> null

@@ -11,9 +11,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -30,7 +33,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -83,7 +85,8 @@ fun AccountScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .padding(horizontal = 14.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (state.user == null) {
@@ -207,12 +210,6 @@ fun AccountScreen(
                             )
                         }
 
-                        OutlinedButton(
-                            onClick = onProfile,
-                            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-                        ) {
-                            Text("Ver meu perfil", fontWeight = FontWeight.SemiBold)
-                        }
                     }
                 }
             }
@@ -229,18 +226,26 @@ fun AccountScreen(
                 shape = RoundedCornerShape(20.dp),
             ) {
                 Column {
+                    if (state.user != null) {
+                        AccountMenuItem(
+                            title = "Meu perfil",
+                            icon = Icons.Default.AccountCircle,
+                            onClick = onProfile,
+                            subtitle = "Foto, bio, publicações e seguidores",
+                        )
+                        AccountMenuItem(
+                            title = "Configurações e privacidade",
+                            icon = Icons.Default.Settings,
+                            onClick = onSettings,
+                            subtitle = "Conta, privacidade, notificações e segurança",
+                        )
+                    }
                     AccountMenuItem("Favoritos", Icons.Default.FavoriteBorder, onFavorites)
                     AccountMenuItem("Pontos e ranking", Icons.Default.StarOutline, onPoints)
                     AccountMenuItem("Notificações", Icons.Default.NotificationsNone, onNotifications)
                     AccountMenuItem("Comunidade e mensagens", Icons.Default.ChatBubbleOutline, onCommunity)
                     AccountMenuItem("Lives", Icons.Default.LiveTv, onLives)
                     AccountMenuItem("Termos de Uso", Icons.Default.Gavel, onTerms)
-                    AccountMenuItem(
-                        title = "Configurações e privacidade",
-                        icon = Icons.Default.Settings,
-                        onClick = onSettings,
-                        subtitle = "Conta, privacidade, notificações e segurança",
-                    )
                     if (state.isAdmin) {
                         AccountMenuItem(
                             "Painel administrativo",

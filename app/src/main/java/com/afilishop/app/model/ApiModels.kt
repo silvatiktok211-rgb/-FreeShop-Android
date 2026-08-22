@@ -23,6 +23,36 @@ data class Product(
 )
 
 @Serializable
+data class PremiumProductRow(
+    val id: String,
+    @SerialName("ml_item_id") val mlItemId: String? = null,
+    @SerialName("affiliate_link") val affiliateLink: String? = null,
+    @SerialName("original_affiliate_url") val originalAffiliateUrl: String? = null,
+    val title: String,
+    @SerialName("current_price") val currentPrice: Double? = null,
+    @SerialName("original_price") val originalPrice: Double? = null,
+    @SerialName("discount_percentage") val discountPercentage: Double? = null,
+    val thumbnail: String? = null,
+    val images: List<String> = emptyList(),
+    @SerialName("user_id") val userId: String? = null,
+    val availability: Boolean = true,
+) {
+    fun toProduct() = Product(
+        id = id,
+        title = title,
+        price = currentPrice,
+        currency = "BRL",
+        imageUrl = thumbnail ?: images.firstOrNull(),
+        images = images,
+        oldPrice = originalPrice,
+        discountPercentage = discountPercentage,
+        affiliateUrl = affiliateLink,
+        originalAffiliateUrl = originalAffiliateUrl,
+        priorityTier = 3,
+    )
+}
+
+@Serializable
 data class Category(
     val id: String,
     val name: String,
@@ -97,5 +127,6 @@ data class SignUpRequest(val email: String, val password: String, val data: Map<
 data class HomePayload(
     val products: List<Product> = emptyList(),
     val categories: List<Category> = emptyList(),
-    val banners: List<Banner> = emptyList()
+    val banners: List<Banner> = emptyList(),
+    val premiumProducts: List<Product> = emptyList(),
 )
