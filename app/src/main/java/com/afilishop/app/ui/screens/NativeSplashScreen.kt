@@ -37,9 +37,9 @@ fun NativeSplashScreen(onDone: () -> Unit) {
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFFFF8A22),
-                        Color(0xFFFF6A00),
-                        Color(0xFFF45100)
+                        Color(0xFFFFF4EC),
+                        Color.White,
+                        Color.White
                     )
                 )
             )
@@ -52,17 +52,17 @@ fun NativeSplashScreen(onDone: () -> Unit) {
         ) {
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(30.dp))
-                    .background(Color.White.copy(alpha = 0.16f))
-                    .padding(horizontal = 32.dp, vertical = 18.dp),
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFFF9733A))
+                    .padding(horizontal = 25.dp, vertical = 14.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "A",
                     color = Color.White,
-                    fontSize = 76.sp,
+                    fontSize = 48.sp,
                     fontWeight = FontWeight.Black,
-                    lineHeight = 76.sp
+                    lineHeight = 52.sp
                 )
             }
 
@@ -70,8 +70,8 @@ fun NativeSplashScreen(onDone: () -> Unit) {
 
             Text(
                 text = "AfiliShop",
-                color = Color.White,
-                fontSize = 38.sp,
+                color = Color(0xFF1F2028),
+                fontSize = 32.sp,
                 fontWeight = FontWeight.Black,
                 style = MaterialTheme.typography.headlineLarge
             )
@@ -80,7 +80,7 @@ fun NativeSplashScreen(onDone: () -> Unit) {
 
             Text(
                 text = "Simples. Rápido. Para você.",
-                color = Color.White.copy(alpha = 0.9f),
+                color = Color(0xFF777680),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center
