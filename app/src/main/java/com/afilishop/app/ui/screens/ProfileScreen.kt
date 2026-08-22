@@ -20,7 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Crown
+import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Settings
@@ -197,7 +197,7 @@ fun ProfileScreen(
                         )
                         if (tier >= 3) {
                             Icon(
-                                Icons.Default.Crown,
+                                Icons.Default.Stars,
                                 contentDescription = "VIP",
                                 tint = Color(0xFFFFB000),
                                 modifier = Modifier.size(18.dp),
