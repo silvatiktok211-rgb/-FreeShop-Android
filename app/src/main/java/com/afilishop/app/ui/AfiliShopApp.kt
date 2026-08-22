@@ -151,6 +151,7 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
                     onFavorites = { navController.navigate("favorites") },
                     onPoints = { navController.navigate("points") },
                     onSettings = { navController.navigate("settings") },
+                    onTerms = { navController.navigate("terms") },
                 )
             }
             composable("terms") {
