@@ -69,26 +69,32 @@ fun HomeScreen(
         ) {
             item(span = { GridItemSpan(3) }) { val b = state.home.banners.firstOrNull(); Banner(b?.mediaUrl, b?.title ?: "Achados AfiliShop") }
             item(span = { GridItemSpan(3) }) {
-                SectionHeader("Categorias", "Ver todas")
-                LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    items(state.home.categories.take(12), key = { it.id }) { c -> CategoryTile(c) { viewModel.filterCategory(c.id) } }
+                Column {
+                    SectionHeader("Categorias", "Ver todas")
+                    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        items(state.home.categories.take(12), key = { it.id }) { c -> CategoryTile(c) { viewModel.filterCategory(c.id) } }
+                    }
                 }
             }
             item(span = { GridItemSpan(3) }) { QuickLinks() }
             item(span = { GridItemSpan(3) }) {
-                SectionHeader("♛  Produtos Premium", "Ver todos", "Produtos publicados por afiliados VIP")
-                LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(premium, key = { it.id }) { p -> Box(Modifier.width(148.dp)) {
-                        ProductCard(p, { onProduct(p.id) }, favorite = p.id in state.favoriteIds,
-                            onFavorite = if (state.user != null) ({ viewModel.toggleFavorite(p.id) }) else null,
-                            onBuy = { openProduct(p, viewModel, context, onProduct) })
-                    } }
+                Column {
+                    SectionHeader("♛  Produtos Premium", "Ver todos", "Produtos publicados por afiliados VIP")
+                    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(premium, key = { it.id }) { p -> Box(Modifier.width(148.dp)) {
+                            ProductCard(p, { onProduct(p.id) }, favorite = p.id in state.favoriteIds,
+                                onFavorite = if (state.user != null) ({ viewModel.toggleFavorite(p.id) }) else null,
+                                onBuy = { openProduct(p, viewModel, context, onProduct) })
+                        } }
+                    }
                 }
             }
             if (state.videos.isNotEmpty()) item(span = { GridItemSpan(3) }) {
-                SectionHeader("▶  Vídeos dos Premium", "Ver todos", "Assista aos melhores achados dos nossos afiliados VIP", onVideos)
-                LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(state.videos.take(8), key = { it.id }) { VideoTile(it, onVideos) }
+                Column {
+                    SectionHeader("▶  Vídeos dos Premium", "Ver todos", "Assista aos melhores achados dos nossos afiliados VIP", onVideos)
+                    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(state.videos.take(8), key = { it.id }) { VideoTile(it, onVideos) }
+                    }
                 }
             }
             item(span = { GridItemSpan(3) }) { Text("Para você", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Ink, modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 4.dp)) }
@@ -103,7 +109,7 @@ fun HomeScreen(
 
 @Composable private fun HomeHeader(onSearch: () -> Unit, onNotifications: () -> Unit, count: Int) {
     Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 9.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        AsyncImage(BuildConfig.API_BASE_URL.trimEnd('/') + "/logo.png", "AfiliShop", Modifier.size(42.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+        AsyncImage(BuildConfig.API_BASE_URL.trimEnd('/') + "/icon-192.png", "AfiliShop", Modifier.size(42.dp).clip(CircleShape), contentScale = ContentScale.Crop)
         Surface(Modifier.weight(1f).height(48.dp).padding(start = 7.dp).clickable(onClick = onSearch), CircleShape, Color(0xFFF7F7F7), shadowElevation = 2.dp) {
             Row(Modifier.padding(horizontal = 13.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Search, null, tint = Color(0xFF62656E)); Text("Buscar produtos, categorias ou usuários", maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color(0xFF656872), modifier = Modifier.padding(start = 8.dp)) }
         }
