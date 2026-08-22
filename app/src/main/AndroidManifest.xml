@@ -20,6 +20,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AfiliShop"
         android:usesCleartextTraffic="false">
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/afilishop_orange" />
+
         <service
             android:name=".notifications.AfiliShopMessagingService"
             android:exported="false">

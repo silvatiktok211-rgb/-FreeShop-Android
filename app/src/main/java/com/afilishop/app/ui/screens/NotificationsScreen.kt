@@ -40,13 +40,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,13 +51,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.afilishop.app.data.NativeNotification
-import com.afilishop.app.data.NotificationRepository
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.afilishop.app.model.NotificationItem
+import com.afilishop.app.notifications.notificationDestination
 import com.afilishop.app.ui.AfiliShopViewModel
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.temporal.ChronoUnit
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,35 +65,24 @@ fun NotificationsScreen(
     viewModel: AfiliShopViewModel,
     padding: PaddingValues,
     onBack: () -> Unit,
-    onProduct: (String) -> Unit = {},
-    onConversation: (String) -> Unit = {},
+    onNavigate: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val repository = remember { NotificationRepository(context) }
-    val scope = rememberCoroutineScope()
-    var notifications by remember { mutableStateOf<List<NativeNotification>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-
-    suspend fun reload() {
-        notifications = repository.load()
-        loading = false
-    }
-
-    LaunchedEffect(Unit) { reload() }
-    DisposableEffect(repository) { onDispose { repository.close() } }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val notifications = state.notifications
+    LaunchedEffect(Unit) { viewModel.refreshNotifications() }
 
     val unreadCount = notifications.count { !it.isRead }
 
-    fun openNotification(notification: NativeNotification) {
+    fun openNotification(notification: NotificationItem) {
         notification.productId?.takeIf { it.isNotBlank() }?.let {
-            onProduct(it)
+            onNavigate("product/$it")
             return
         }
 
         val link = notification.link.orEmpty()
-        if (notification.type == "new_message" && link.startsWith("/mensagens/")) {
-            val conversationId = link.removePrefix("/mensagens/").substringBefore('?').trim('/')
-            if (conversationId.isNotBlank()) onConversation(conversationId)
+        notificationDestination(link)?.let { destination ->
+            onNavigate(destination)
             return
         }
 
@@ -133,11 +117,7 @@ fun NotificationsScreen(
                 actions = {
                     if (unreadCount > 0) {
                         TextButton(
-                            onClick = {
-                                scope.launch {
-                                    if (repository.markAllRead()) reload()
-                                }
-                            },
+                            onClick = viewModel::markAllNotificationsRead,
                         ) {
                             Icon(Icons.Default.DoneAll, null, modifier = Modifier.size(18.dp))
                             Text("Todas", modifier = Modifier.padding(start = 4.dp))
@@ -148,7 +128,7 @@ fun NotificationsScreen(
         },
     ) { inner ->
         when {
-            loading -> Box(
+            state.notificationsLoading -> Box(
                 modifier = Modifier.fillMaxSize().padding(inner),
                 contentAlignment = Alignment.TopCenter,
             ) {
@@ -183,19 +163,10 @@ fun NotificationsScreen(
                     NotificationCard(
                         notification = notification,
                         onOpen = {
-                            scope.launch {
-                                if (!notification.isRead) repository.markRead(notification.id)
-                                openNotification(notification)
-                                if (!notification.isRead) reload()
-                            }
+                            if (!notification.isRead) viewModel.markNotificationRead(notification)
+                            openNotification(notification)
                         },
-                        onDelete = {
-                            scope.launch {
-                                if (repository.delete(notification.id)) {
-                                    notifications = notifications.filterNot { it.id == notification.id }
-                                }
-                            }
-                        },
+                        onDelete = { viewModel.deleteNotification(notification) },
                     )
                 }
             }
@@ -205,7 +176,7 @@ fun NotificationsScreen(
 
 @Composable
 private fun NotificationCard(
-    notification: NativeNotification,
+    notification: NotificationItem,
     onOpen: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -284,13 +255,15 @@ private fun NotificationCard(
                 }
             }
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
-                Icon(
-                    Icons.Default.Delete,
-                    "Apagar notificação",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
+            if (!notification.isSystemProtected) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
+                    Icon(
+                        Icons.Default.Delete,
+                        "Apagar notificação",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }

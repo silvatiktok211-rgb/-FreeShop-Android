@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="afilishop_orange">#FF6930</color>
     <color name="afili_orange">#FF6A00</color>
     <color name="afili_orange_dark">#D95400</color>
     <color name="afili_background">#FCFBF8</color>

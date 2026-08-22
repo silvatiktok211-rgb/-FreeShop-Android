@@ -18,9 +18,11 @@ import com.afilishop.app.ui.theme.AfiliShopTheme
 
 class MainActivity : ComponentActivity() {
     private val repository by lazy { AfiliShopRepository(this) }
+    private var incomingIntent by mutableStateOf<Intent?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        incomingIntent = intent
         setContent {
             AfiliShopTheme {
                 var showSplash by rememberSaveable { mutableStateOf(true) }
@@ -35,7 +37,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     val viewModel: AfiliShopViewModel = viewModel(factory = factory)
-                    AfiliShopApp(viewModel = viewModel, initialIntent = intent)
+                    AfiliShopApp(viewModel = viewModel, initialIntent = incomingIntent)
                 }
             }
         }
@@ -44,5 +46,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        incomingIntent = intent
     }
 }

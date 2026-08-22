@@ -1,16 +1,23 @@
 package com.afilishop.app.ui
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -20,6 +27,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.afilishop.app.ui.components.AfiliBottomBar
 import com.afilishop.app.ui.components.AfiliFloatingActions
+import com.afilishop.app.ui.components.NativePushRegistrar
+import com.afilishop.app.notifications.AfiliShopMessagingService
+import com.afilishop.app.notifications.notificationDestination
 import com.afilishop.app.ui.screens.AccountScreen
 import com.afilishop.app.ui.screens.AdminScreen
 import com.afilishop.app.ui.screens.AuthScreen
@@ -44,6 +54,7 @@ import com.afilishop.app.ui.screens.VipScreen
 
 @Composable
 fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
+    val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -64,6 +75,7 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
             }
         }
     }
+    val notificationLink = initialIntent?.getStringExtra(AfiliShopMessagingService.EXTRA_NOTIFICATION_LINK)
 
     LaunchedEffect(initialIntent) {
         val recoveryAccess = recoveryParams["access_token"]
@@ -71,12 +83,44 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
         if (isRecoveryLink && !recoveryAccess.isNullOrBlank()) {
             viewModel.restoreExternalSession(recoveryAccess, recoveryRefresh)
         }
-        val sharedText = initialIntent?.getStringExtra(Intent.EXTRA_TEXT)
-        val deepLink = initialIntent?.data?.toString()
-        if (!isRecoveryLink && (!sharedText.isNullOrBlank() || !deepLink.isNullOrBlank())) {
-            navController.navigate("explore")
+        if (!isRecoveryLink) {
+            val sharedText = initialIntent?.getStringExtra(Intent.EXTRA_TEXT)
+            val deepLink = initialIntent?.data?.toString()
+            val destination = notificationDestination(notificationLink)
+                ?: deepLink?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+                    ?.let(::notificationDestination)
+            when {
+                destination != null -> navController.navigate(destination) { launchSingleTop = true }
+                !notificationLink.isNullOrBlank() &&
+                    (notificationLink.startsWith("http://") || notificationLink.startsWith("https://")) -> {
+                    val uri = Uri.parse(notificationLink)
+                    if (uri.host.equals("afilishop.lovable.app", ignoreCase = true)) {
+                        navController.navigate("explore") { launchSingleTop = true }
+                    } else {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                    }
+                }
+                !sharedText.isNullOrBlank() -> navController.navigate("explore") { launchSingleTop = true }
+            }
         }
     }
+
+    DisposableEffect(context, viewModel) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context?, intent: Intent?) {
+                viewModel.refreshNotifications()
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(AfiliShopMessagingService.ACTION_NOTIFICATION_RECEIVED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
+    }
+
+    NativePushRegistrar(userId = state.user?.id, viewModel = viewModel)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -177,8 +221,9 @@ fun AfiliShopApp(viewModel: AfiliShopViewModel, initialIntent: Intent? = null) {
                     viewModel = viewModel,
                     padding = padding,
                     onBack = { navController.popBackStack() },
-                    onProduct = { productId -> navController.navigate("product/$productId") },
-                    onConversation = { conversationId -> navController.navigate("conversation/$conversationId") },
+                    onNavigate = { destination ->
+                        navController.navigate(destination) { launchSingleTop = true }
+                    },
                 )
             }
             composable("favorites") {

@@ -14,6 +14,8 @@ import com.afilishop.app.model.NotificationItem
 import com.afilishop.app.model.NotificationPreferences
 import com.afilishop.app.model.NotificationPreferencesPayload
 import com.afilishop.app.model.NotificationReadUpdate
+import com.afilishop.app.model.NotificationUserState
+import com.afilishop.app.model.NotificationUserStatePayload
 import com.afilishop.app.model.AdminActionRequest
 import com.afilishop.app.model.AdminResponse
 import com.afilishop.app.model.AuthUserUpdateRequest
@@ -50,6 +52,8 @@ import com.afilishop.app.model.Profile
 import com.afilishop.app.model.SignInRequest
 import com.afilishop.app.model.SignUpRequest
 import com.afilishop.app.model.SocialVideo
+import com.afilishop.app.notifications.PushTokenStore
+import com.google.firebase.messaging.FirebaseMessaging
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
@@ -66,12 +70,15 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.tasks.await
+import java.time.Instant
 
 class AfiliShopRepository(context: Context) {
+    private val appContext = context.applicationContext
     private val supabaseUrl = BuildConfig.SUPABASE_URL.trimEnd('/')
     private val anonKey = BuildConfig.SUPABASE_ANON_KEY
     private val configured = supabaseUrl.isNotBlank() && anonKey.isNotBlank()
-    private val sessionStore = SessionStore(context.applicationContext)
+    private val sessionStore = SessionStore(appContext)
     private val client = HttpClient(Android) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false })
@@ -366,36 +373,130 @@ class AfiliShopRepository(context: Context) {
     suspend fun loadNotifications(userId: String): List<NotificationItem> {
         if (!configured || userId.isBlank()) return emptyList()
         return runCatching {
-            getTable<NotificationItem>("notifications", mapOf("select" to "id,title,body,type,link,is_read,created_at", "user_id" to "eq.$userId", "order" to "created_at.desc", "limit" to "60"))
+            val preferences = loadNotificationPreferences(userId) ?: NotificationPreferences()
+            val notifications = getTable<NotificationItem>(
+                "notifications",
+                mapOf(
+                    "select" to "id,user_id,title,body,type,link,product_id,read_at,created_at,is_system_protected,actor_id,count",
+                    "or" to "(user_id.eq.$userId,user_id.is.null)",
+                    "order" to "created_at.desc",
+                    "limit" to "80",
+                ),
+            )
+            val broadcastIds = notifications.filter { it.isBroadcast }.map { it.id }
+            val statesByNotification = if (broadcastIds.isEmpty()) {
+                emptyMap()
+            } else {
+                getTable<NotificationUserState>(
+                    "notification_user_states",
+                    mapOf(
+                        "select" to "notification_id,read_at,dismissed_at",
+                        "user_id" to "eq.$userId",
+                        "notification_id" to "in.(${broadcastIds.joinToString(",")})",
+                    ),
+                ).associateBy { it.notificationId }
+            }
+
+            notifications
+                .asSequence()
+                .filter { it.allowedBy(preferences) }
+                .filter { notification ->
+                    !notification.isBroadcast || statesByNotification[notification.id]?.dismissedAt == null
+                }
+                .map { notification ->
+                    if (!notification.isBroadcast) notification
+                    else notification.copy(readAt = statesByNotification[notification.id]?.readAt)
+                }
+                .toList()
         }.getOrElse { emptyList() }
     }
 
     suspend fun loadNotificationPreferences(userId: String): NotificationPreferences? {
         if (!configured || userId.isBlank()) return null
-        return runCatching { getTable<NotificationPreferences>("notification_preferences", mapOf("select" to "push_enabled,email_enabled", "user_id" to "eq.$userId", "limit" to "1")).firstOrNull() }.getOrNull()
+        return runCatching { getTable<NotificationPreferences>("notification_preferences", mapOf("select" to "allow_promo,allow_price_alerts", "user_id" to "eq.$userId", "limit" to "1")).firstOrNull() }.getOrNull()
     }
 
     suspend fun registerPushToken(userId: String, token: String): Boolean {
         if (!configured || userId.isBlank() || token.isBlank()) return false
-        return postTable("user_push_tokens", PushTokenPayload(userId, token, "android"), onConflict = "token")
+        val saved = postTable(
+            "user_push_tokens",
+            PushTokenPayload(userId, token, updatedAt = Instant.now().toString()),
+            onConflict = "token",
+        )
+        if (saved) PushTokenStore.markSynced(appContext, token)
+        return saved
     }
 
-    suspend fun updateNotificationPreferences(userId: String, pushEnabled: Boolean, emailEnabled: Boolean): Boolean {
+    suspend fun updateNotificationPreferences(userId: String, allowPromo: Boolean, allowPriceAlerts: Boolean): Boolean {
         if (!configured || userId.isBlank()) return false
-        return upsertTable("notification_preferences", NotificationPreferencesPayload(userId, pushEnabled, emailEnabled), onConflict = "user_id")
+        return upsertTable("notification_preferences", NotificationPreferencesPayload(userId, allowPromo, allowPriceAlerts), onConflict = "user_id")
     }
 
-    suspend fun markNotificationRead(id: String): Boolean {
-        if (!configured || id.isBlank()) return false
-        val response = client.post("$supabaseUrl/rest/v1/notifications") {
-            header("apikey", anonKey)
-            session?.accessToken?.let { bearerAuth(it) }
-            header("Content-Type", "application/json")
-            header("Prefer", "return=minimal")
-            url.parameters.append("id", "eq.$id")
-            setBody(Json.encodeToString(NotificationReadUpdate()))
+    suspend fun markNotificationRead(userId: String, notification: NotificationItem): Boolean {
+        if (!configured || userId.isBlank() || notification.id.isBlank()) return false
+        val now = Instant.now().toString()
+        return if (notification.isBroadcast) {
+            postTable(
+                "notification_user_states",
+                NotificationUserStatePayload(notification.id, userId, readAt = now),
+                onConflict = "notification_id,user_id",
+            )
+        } else {
+            patchTable(
+                "notifications",
+                NotificationReadUpdate(now),
+                mapOf("id" to "eq.${notification.id}", "user_id" to "eq.$userId"),
+            )
         }
-        return response.status.value in 200..299
+    }
+
+    suspend fun markAllNotificationsRead(userId: String, notifications: List<NotificationItem>): Boolean {
+        if (!configured || userId.isBlank()) return false
+        val now = Instant.now().toString()
+        val personalIds = notifications.filter { !it.isBroadcast && !it.isRead }.map { it.id }
+        val broadcastIds = notifications.filter { it.isBroadcast && !it.isRead }.map { it.id }
+        val personalOk = personalIds.isEmpty() || patchTable(
+            "notifications",
+            NotificationReadUpdate(now),
+            mapOf("id" to "in.(${personalIds.joinToString(",")})", "user_id" to "eq.$userId"),
+        )
+        val broadcastOk = broadcastIds.isEmpty() || postTable(
+            "notification_user_states",
+            broadcastIds.map { NotificationUserStatePayload(it, userId, readAt = now) },
+            onConflict = "notification_id,user_id",
+        )
+        return personalOk && broadcastOk
+    }
+
+    suspend fun deleteNotification(userId: String, notification: NotificationItem): Boolean {
+        if (!configured || userId.isBlank() || notification.id.isBlank() || notification.isSystemProtected) return false
+        return if (notification.isBroadcast) {
+            val now = Instant.now().toString()
+            postTable(
+                "notification_user_states",
+                NotificationUserStatePayload(
+                    notificationId = notification.id,
+                    userId = userId,
+                    readAt = notification.readAt ?: now,
+                    dismissedAt = now,
+                ),
+                onConflict = "notification_id,user_id",
+            )
+        } else {
+            deleteTable(
+                "notifications",
+                mapOf(
+                    "id" to "eq.${notification.id}",
+                    "user_id" to "eq.$userId",
+                    "is_system_protected" to "eq.false",
+                ),
+            )
+        }
+    }
+
+    suspend fun deletePushToken(userId: String, token: String): Boolean {
+        if (!configured || userId.isBlank() || token.isBlank()) return false
+        return deleteTable("user_push_tokens", mapOf("user_id" to "eq.$userId", "token" to "eq.$token"))
     }
 
     suspend fun uploadObject(bucket: String, path: String, bytes: ByteArray, contentType: String): String? {
@@ -511,7 +612,21 @@ class AfiliShopRepository(context: Context) {
 
     private suspend inline fun <reified T> upsertTable(table: String, payload: T, onConflict: String): Boolean = postTable(table, payload, onConflict)
 
-    suspend fun signOut() { session = null; sessionStore.clear() }
+    suspend fun signOut() {
+        val userId = session?.user?.id
+        val tokens = listOfNotNull(PushTokenStore.current(appContext), PushTokenStore.pending(appContext)).distinct()
+        if (!userId.isNullOrBlank()) {
+            tokens.forEach { token -> runCatching { deletePushToken(userId, token) } }
+        }
+        runCatching { FirebaseMessaging.getInstance().deleteToken().await() }
+        PushTokenStore.clear(appContext)
+        session = null
+        sessionStore.clear()
+    }
+
+    fun close() {
+        client.close()
+    }
 
     private suspend inline fun <reified T> getTable(table: String, params: Map<String, String>): List<T> {
         val response = client.get("$supabaseUrl/rest/v1/$table") {
@@ -522,6 +637,21 @@ class AfiliShopRepository(context: Context) {
         if (response.status.value !in 200..299) error("Supabase ${response.status.value}")
         return response.body()
     }
+}
+
+private val PROMO_NOTIFICATION_TYPES = setOf(
+    "promo", "new_product", "abandoned_cart", "opportunity", "upgrade_suggestion",
+)
+
+private val PRICE_NOTIFICATION_TYPES = setOf(
+    "price_drop", "price_up", "product_back", "price_reduction", "favorite_discount",
+)
+
+private fun NotificationItem.allowedBy(preferences: NotificationPreferences): Boolean = when {
+    isSystemProtected || type == "admin" -> true
+    type in PROMO_NOTIFICATION_TYPES -> preferences.allowPromo != false
+    type in PRICE_NOTIFICATION_TYPES -> preferences.allowPriceAlerts != false
+    else -> true
 }
 
 private object DemoData {

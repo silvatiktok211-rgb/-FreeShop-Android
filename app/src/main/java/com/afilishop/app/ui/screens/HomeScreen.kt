@@ -73,7 +73,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val premium = state.home.products.filter { (it.priorityTier ?: 0) > 0 }.ifEmpty { state.home.products }.take(8)
     Column(Modifier.fillMaxSize().padding(padding).background(Page)) {
-        HomeHeader(onSearch, onNotifications, state.notifications.size)
+        HomeHeader(onSearch, onNotifications, state.notifications.count { !it.isRead })
         LazyVerticalGrid(
             columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 112.dp),

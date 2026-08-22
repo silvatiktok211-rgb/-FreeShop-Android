@@ -18,10 +18,13 @@ android {
         def supabaseUrl = project.findProperty("SUPABASE_URL") ?: System.getenv("SUPABASE_URL") ?: ""
         def supabaseAnonKey = project.findProperty("SUPABASE_ANON_KEY") ?: System.getenv("SUPABASE_ANON_KEY") ?: ""
         def apiBaseUrl = project.findProperty("API_BASE_URL") ?: System.getenv("API_BASE_URL") ?: "https://afilishop.lovable.app"
-        def firebaseApiKey = project.findProperty("FIREBASE_API_KEY") ?: System.getenv("FIREBASE_API_KEY") ?: ""
-        def firebaseAppId = project.findProperty("FIREBASE_APP_ID") ?: System.getenv("FIREBASE_APP_ID") ?: ""
-        def firebaseProjectId = project.findProperty("FIREBASE_PROJECT_ID") ?: System.getenv("FIREBASE_PROJECT_ID") ?: ""
-        def firebaseSenderId = project.findProperty("FIREBASE_SENDER_ID") ?: System.getenv("FIREBASE_SENDER_ID") ?: ""
+        // These are public Firebase client identifiers, not administrative secrets.
+        // Environment/project properties still win so a dedicated Android app ID can
+        // replace the shared project app ID without another source-code release.
+        def firebaseApiKey = project.findProperty("FIREBASE_API_KEY") ?: System.getenv("FIREBASE_API_KEY") ?: "AIzaSyCKMzYs8PbPPF6dXGRu8yTKPFywE9Gf5iA"
+        def firebaseAppId = project.findProperty("FIREBASE_APP_ID") ?: System.getenv("FIREBASE_APP_ID") ?: "1:61259740700:web:14bfd96ed76cf4279b11d9"
+        def firebaseProjectId = project.findProperty("FIREBASE_PROJECT_ID") ?: System.getenv("FIREBASE_PROJECT_ID") ?: "afilishopp-b1569"
+        def firebaseSenderId = project.findProperty("FIREBASE_SENDER_ID") ?: System.getenv("FIREBASE_SENDER_ID") ?: "61259740700"
         buildConfigField "String", "SUPABASE_URL", "\"${supabaseUrl.replace('\\', '\\\\').replace('"', '\\"')}\""
         buildConfigField "String", "SUPABASE_ANON_KEY", "\"${supabaseAnonKey.replace('\\', '\\\\').replace('"', '\\"')}\""
         buildConfigField "String", "API_BASE_URL", "\"${apiBaseUrl.replace('\\', '\\\\').replace('"', '\\"')}\""
@@ -72,6 +75,7 @@ dependencies {
     implementation "androidx.core:core-splashscreen:1.0.1"
     implementation "androidx.browser:browser:1.8.0"
     implementation "androidx.datastore:datastore-preferences:1.1.2"
+    implementation "androidx.work:work-runtime-ktx:2.10.1"
     implementation "com.google.firebase:firebase-messaging:24.1.2"
     implementation "com.android.billingclient:billing-ktx:7.1.1"
     implementation "androidx.media3:media3-exoplayer:1.6.1"
@@ -88,6 +92,7 @@ dependencies {
     implementation "io.github.jan-tennert.supabase:realtime-kt:3.1.4"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.1"
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.jetbrains.kotlin:kotlin-test:2.0.21"
 }

@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 data class AfiliShopUiState(
     val isLoading: Boolean = true,
@@ -61,6 +62,7 @@ data class AfiliShopUiState(
     val error: String? = null,
     val authMessage: String? = null,
     val notifications: List<NotificationItem> = emptyList(),
+    val notificationsLoading: Boolean = false,
     val notificationPreferences: NotificationPreferences = NotificationPreferences(),
     val conversations: List<Conversation> = emptyList(),
     val messages: List<ChatMessage> = emptyList(),
@@ -281,14 +283,30 @@ class AfiliShopViewModel(private val repository: AfiliShopRepository) : ViewMode
             val favoriteIds = repository.loadFavoriteIds(userId)
             val points = repository.loadPoints(userId)
             val pointTransactions = repository.loadPointTransactions(userId)
-            _uiState.update { it.copy(notifications = notifications, notificationPreferences = notificationPreferences, conversations = conversations, subscription = subscription, isAdmin = isAdmin, profile = profile, favoriteIds = favoriteIds, points = points, pointTransactions = pointTransactions) }
+            _uiState.update { it.copy(notifications = notifications, notificationsLoading = false, notificationPreferences = notificationPreferences, conversations = conversations, subscription = subscription, isAdmin = isAdmin, profile = profile, favoriteIds = favoriteIds, points = points, pointTransactions = pointTransactions) }
         }
     }
 
-    fun updateNotificationPreferences(pushEnabled: Boolean, emailEnabled: Boolean) {
+    fun refreshNotifications() {
+        val userId = _uiState.value.user?.id
+        if (userId.isNullOrBlank()) {
+            _uiState.update { it.copy(notifications = emptyList(), notificationsLoading = false) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(notificationsLoading = true) }
+            val notifications = repository.loadNotifications(userId)
+            _uiState.update { it.copy(notifications = notifications, notificationsLoading = false) }
+        }
+    }
+
+    fun updateNotificationPreferences(allowPromo: Boolean, allowPriceAlerts: Boolean) {
         val userId = _uiState.value.user?.id ?: return
         viewModelScope.launch {
-            if (repository.updateNotificationPreferences(userId, pushEnabled, emailEnabled)) _uiState.update { it.copy(notificationPreferences = NotificationPreferences(pushEnabled, emailEnabled)) }
+            if (repository.updateNotificationPreferences(userId, allowPromo, allowPriceAlerts)) {
+                _uiState.update { it.copy(notificationPreferences = NotificationPreferences(allowPromo, allowPriceAlerts)) }
+                refreshNotifications()
+            }
         }
     }
 
@@ -297,9 +315,41 @@ class AfiliShopViewModel(private val repository: AfiliShopRepository) : ViewMode
         viewModelScope.launch { repository.registerPushToken(userId, token) }
     }
 
-    fun markNotificationRead(id: String) {
+    fun markNotificationRead(notification: NotificationItem) {
+        val userId = _uiState.value.user?.id ?: return
         viewModelScope.launch {
-            if (repository.markNotificationRead(id)) _uiState.update { state -> state.copy(notifications = state.notifications.map { if (it.id == id) it.copy(isRead = true) else it }) }
+            if (repository.markNotificationRead(userId, notification)) {
+                val now = Instant.now().toString()
+                _uiState.update { state ->
+                    state.copy(notifications = state.notifications.map {
+                        if (it.id == notification.id) it.copy(readAt = now) else it
+                    })
+                }
+            }
+        }
+    }
+
+    fun markAllNotificationsRead() {
+        val userId = _uiState.value.user?.id ?: return
+        val notifications = _uiState.value.notifications
+        viewModelScope.launch {
+            if (repository.markAllNotificationsRead(userId, notifications)) {
+                val now = Instant.now().toString()
+                _uiState.update { state ->
+                    state.copy(notifications = state.notifications.map { it.copy(readAt = it.readAt ?: now) })
+                }
+            }
+        }
+    }
+
+    fun deleteNotification(notification: NotificationItem) {
+        val userId = _uiState.value.user?.id ?: return
+        viewModelScope.launch {
+            if (repository.deleteNotification(userId, notification)) {
+                _uiState.update { state ->
+                    state.copy(notifications = state.notifications.filterNot { it.id == notification.id })
+                }
+            }
         }
     }
 

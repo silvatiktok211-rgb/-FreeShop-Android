@@ -6,18 +6,26 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class NotificationItem(
     val id: String,
+    @SerialName("user_id") val userId: String? = null,
     val title: String,
     val body: String? = null,
-    val type: String? = null,
+    val type: String = "admin",
     val link: String? = null,
-    @SerialName("is_read") val isRead: Boolean = false,
-    @SerialName("created_at") val createdAt: String? = null
-)
+    @SerialName("product_id") val productId: String? = null,
+    @SerialName("read_at") val readAt: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("is_system_protected") val isSystemProtected: Boolean = false,
+    @SerialName("actor_id") val actorId: String? = null,
+    val count: Int? = 1,
+) {
+    val isRead: Boolean get() = !readAt.isNullOrBlank()
+    val isBroadcast: Boolean get() = userId == null
+}
 
 @Serializable
 data class NotificationPreferences(
-    @SerialName("push_enabled") val pushEnabled: Boolean = true,
-    @SerialName("email_enabled") val emailEnabled: Boolean = true
+    @SerialName("allow_promo") val allowPromo: Boolean? = true,
+    @SerialName("allow_price_alerts") val allowPriceAlerts: Boolean? = true,
 )
 
 @Serializable
@@ -90,7 +98,9 @@ data class PublishVideoRequest(
 data class PushTokenPayload(
     @SerialName("user_id") val userId: String,
     val token: String,
-    val platform: String = "android"
+    val platform: String = "android",
+    @SerialName("user_agent") val userAgent: String = "AfiliShop Android",
+    @SerialName("updated_at") val updatedAt: String? = null,
 )
 
 @Serializable
@@ -101,13 +111,28 @@ data class ChatMessageInsert(
 )
 
 @Serializable
-data class NotificationReadUpdate(@SerialName("is_read") val isRead: Boolean = true)
+data class NotificationReadUpdate(@SerialName("read_at") val readAt: String)
+
+@Serializable
+data class NotificationUserState(
+    @SerialName("notification_id") val notificationId: String,
+    @SerialName("read_at") val readAt: String? = null,
+    @SerialName("dismissed_at") val dismissedAt: String? = null,
+)
+
+@Serializable
+data class NotificationUserStatePayload(
+    @SerialName("notification_id") val notificationId: String,
+    @SerialName("user_id") val userId: String,
+    @SerialName("read_at") val readAt: String? = null,
+    @SerialName("dismissed_at") val dismissedAt: String? = null,
+)
 
 @Serializable
 data class NotificationPreferencesPayload(
     @SerialName("user_id") val userId: String,
-    @SerialName("push_enabled") val pushEnabled: Boolean,
-    @SerialName("email_enabled") val emailEnabled: Boolean
+    @SerialName("allow_promo") val allowPromo: Boolean,
+    @SerialName("allow_price_alerts") val allowPriceAlerts: Boolean,
 )
 
 @Serializable
