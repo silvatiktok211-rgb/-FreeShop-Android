@@ -1,0 +1,52 @@
+name: Secure Source Bridge
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/secure-source-bridge.yml"
+      - ".secure-bridge-trigger"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bridge-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate ephemeral encryption key
+        run: |
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/bridge-private.pem >/dev/null 2>&1
+          openssl rsa -pubout -in /tmp/bridge-private.pem -out /tmp/bridge-public.pem >/dev/null 2>&1
+          echo "BRIDGE_PUBLIC_KEY_B64=$(base64 -w0 /tmp/bridge-public.pem)"
+      - name: Wait for encrypted payload and test private URL scope
+        run: |
+          set -euo pipefail
+          payload_url="https://raw.githubusercontent.com/silvatiktok211-rgb/-FreeShop-Android/main/.secure-source-payload.b64"
+          for i in $(seq 1 100); do
+            if curl -fsSL "$payload_url" -o /tmp/payload.b64; then break; fi
+            sleep 3
+          done
+          test -s /tmp/payload.b64
+          base64 -d /tmp/payload.b64 > /tmp/payload.enc
+          openssl pkeyutl -decrypt -inkey /tmp/bridge-private.pem -in /tmp/payload.enc \
+            -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 > /tmp/private-url.txt
+          private_url="$(cat /tmp/private-url.txt)"
+          case "$private_url" in https://raw.githubusercontent.com/silvatiktok211-rgb/afilishop/*) ;; *) exit 31;; esac
+          curl -fsSL "$private_url" -o /tmp/exact.txt
+          grep -q 'com.android.application' /tmp/exact.txt
+          token="${private_url##*?token=}"
+          other="https://raw.githubusercontent.com/silvatiktok211-rgb/afilishop/f0f98791a7f0876ccac56be14f424322626081e3/android-native/source/settings.gradle?token=${token}"
+          if curl -fsSL "$other" -o /tmp/other.txt && grep -q 'dependencyResolutionManagement' /tmp/other.txt; then
+            echo "PRIVATE_RAW_TOKEN_SCOPE=repository"
+          else
+            echo "PRIVATE_RAW_TOKEN_SCOPE=file"
+          fi
+          archive="https://github.com/silvatiktok211-rgb/afilishop/archive/f0f98791a7f0876ccac56be14f424322626081e3.zip?token=${token}"
+          code="$(curl -sS -L -o /tmp/source.zip -w '%{http_code}' "$archive" || true)"
+          if [ "$code" = "200" ] && unzip -t /tmp/source.zip >/dev/null 2>&1; then
+            echo "PRIVATE_ARCHIVE_WITH_RAW_TOKEN=ok"
+          else
+            echo "PRIVATE_ARCHIVE_WITH_RAW_TOKEN=denied:${code}"
+          fi
+          rm -f /tmp/private-url.txt /tmp/payload.enc /tmp/payload.b64 /tmp/bridge-private.pem
