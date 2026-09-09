@@ -11,14 +11,16 @@ import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
 
 class AfiliShopApplication : Application(), SingletonImageLoader.Factory {
-    override fun newImageLoader(context: Context): ImageLoader =
-        ImageLoader.Builder(context)
-            .components { add(VideoFrameDecoder.Factory()) }
-            .build()
+    override fun newImageLoader(context: Context): ImageLoader = ImageLoader.Builder(context)
+        .components { add(VideoFrameDecoder.Factory()) }
+        .build()
 
     override fun onCreate() {
         super.onCreate()
-        if (BuildConfig.FIREBASE_PROJECT_ID.isBlank() || BuildConfig.FIREBASE_APP_ID.isBlank() || BuildConfig.FIREBASE_API_KEY.isBlank()) {
+        if (BuildConfig.FIREBASE_PROJECT_ID.isBlank() ||
+            BuildConfig.FIREBASE_APP_ID.isBlank() ||
+            BuildConfig.FIREBASE_API_KEY.isBlank()
+        ) {
             Log.e(TAG, "Firebase client configuration is missing; native push is disabled")
             return
         }
