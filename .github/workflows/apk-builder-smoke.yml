@@ -13,6 +13,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
+      - name: Verify public runner
+        run: |
           echo "PUBLIC_RUNNER_OK"
           java -version
+      - name: Test same-owner private checkout permission
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          git ls-remote "https://x-access-token:${GH_TOKEN}@github.com/silvatiktok211-rgb/afilishop.git" HEAD >/tmp/private-head.txt 2>/tmp/private-error.txt
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "PRIVATE_REPO_ACCESS_OK"
+            cat /tmp/private-head.txt
+          else
+            echo "PRIVATE_REPO_ACCESS_DENIED"
+            sed -E 's#https://[^ ]*@github.com#https://***@github.com#g' /tmp/private-error.txt
+          fi
+          exit 0
