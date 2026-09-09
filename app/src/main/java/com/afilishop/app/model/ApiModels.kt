@@ -2,6 +2,7 @@ package com.afilishop.app.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 data class Product(
@@ -18,47 +19,14 @@ data class Product(
     @SerialName("original_affiliate_url") val originalAffiliateUrl: String? = null,
     val description: String? = null,
     @SerialName("category_id") val categoryId: String? = null,
-    @SerialName("priority_tier") val priorityTier: Int? = 0,
-    @SerialName("created_at") val createdAt: String? = null
-)
-
-@Serializable
-data class PremiumProductRow(
-    val id: String,
-    @SerialName("ml_item_id") val mlItemId: String? = null,
-    @SerialName("affiliate_link") val affiliateLink: String? = null,
-    @SerialName("original_affiliate_url") val originalAffiliateUrl: String? = null,
-    val title: String,
-    @SerialName("current_price") val currentPrice: Double? = null,
-    @SerialName("original_price") val originalPrice: Double? = null,
-    @SerialName("discount_percentage") val discountPercentage: Double? = null,
-    val thumbnail: String? = null,
-    val images: List<String> = emptyList(),
     @SerialName("user_id") val userId: String? = null,
-    val availability: Boolean = true,
-) {
-    fun toProduct() = Product(
-        id = id,
-        title = title,
-        price = currentPrice,
-        currency = "BRL",
-        imageUrl = thumbnail ?: images.firstOrNull(),
-        images = images,
-        oldPrice = originalPrice,
-        discountPercentage = discountPercentage,
-        affiliateUrl = affiliateLink,
-        originalAffiliateUrl = originalAffiliateUrl,
-        priorityTier = 3,
-    )
-}
+    @SerialName("priority_tier") val priorityTier: Int? = 0,
+    @SerialName("created_at") val createdAt: String? = null,
+    @Transient val sellerProfile: Profile? = null,
+)
 
 @Serializable
-data class Category(
-    val id: String,
-    val name: String,
-    val slug: String? = null,
-    val icon: String? = null
-)
+data class Category(val id: String, val name: String, val slug: String? = null, val icon: String? = null)
 
 @Serializable
 data class Banner(
@@ -67,17 +35,20 @@ data class Banner(
     val title: String? = null,
     val subtitle: String? = null,
     @SerialName("link_url") val linkUrl: String? = null,
-    val type: String? = null
+    val type: String? = null,
 )
 
 @Serializable
 data class Profile(
     val id: String,
+    val username: String? = null,
     @SerialName("display_name") val displayName: String? = null,
     @SerialName("avatar_url") val avatarUrl: String? = null,
     val bio: String? = null,
+    @SerialName("verification_type") val verificationType: String? = null,
+    @SerialName("is_admin") val isAdmin: Boolean = false,
     @SerialName("followers_count") val followersCount: Int? = 0,
-    @SerialName("following_count") val followingCount: Int? = 0
+    @SerialName("following_count") val followingCount: Int? = 0,
 )
 
 @Serializable
@@ -98,30 +69,34 @@ data class SocialVideo(
     @SerialName("user_id") val userId: String? = null,
     @SerialName("likes_count") val likesCount: Int? = 0,
     @SerialName("comments_count") val commentsCount: Int? = 0,
+    @SerialName("saves_count") val savesCount: Int? = 0,
     @SerialName("created_at") val createdAt: String? = null,
     val profile: Profile? = null,
-    val product: Product? = null
-)
+    val product: Product? = null,
+    @Transient val boostCampaignId: String? = null,
+    @Transient val promotionType: String? = null,
+) {
+    val isPromoted: Boolean get() = !boostCampaignId.isNullOrBlank()
+    val promotionLabel: String?
+        get() = when (promotionType) {
+            "business" -> "Patrocinado"
+            "creator" -> "Impulsionado"
+            else -> null
+        }
+}
 
 @Serializable
 data class AuthSession(
     @SerialName("access_token") val accessToken: String,
     @SerialName("refresh_token") val refreshToken: String? = null,
     @SerialName("expires_in") val expiresIn: Long? = null,
-    val user: AuthUser? = null
+    val user: AuthUser? = null,
 )
 
 @Serializable
-data class AuthUser(
-    val id: String,
-    val email: String? = null
-)
-
-@Serializable
-data class SignInRequest(val email: String, val password: String)
-
-@Serializable
-data class SignUpRequest(val email: String, val password: String, val data: Map<String, String> = emptyMap())
+data class AuthUser(val id: String, val email: String? = null)
+@Serializable data class SignInRequest(val email: String, val password: String)
+@Serializable data class SignUpRequest(val email: String, val password: String, val data: Map<String, String> = emptyMap())
 
 @Serializable
 data class HomePayload(
@@ -129,4 +104,56 @@ data class HomePayload(
     val categories: List<Category> = emptyList(),
     val banners: List<Banner> = emptyList(),
     val premiumProducts: List<Product> = emptyList(),
+    val presentation: SitePresentation = SitePresentation(),
 )
+
+@Serializable
+data class SitePresentation(
+    val brandName: String = "AfiliShop",
+    val logoUrl: String? = null,
+    val appIconUrl: String? = null,
+    val loginBackgroundUrl: String? = null,
+    val loginTitle: String? = null,
+    val loginSubtitle: String? = null,
+    val whatsappEnabled: Boolean = false,
+    val whatsappNumber: String? = null,
+    val whatsappMessage: String = "Olá! Vim pelo aplicativo AfiliShop.",
+    val systemAlertEnabled: Boolean = false,
+    val systemAlertTitle: String? = null,
+    val systemAlertMessage: String? = null,
+    val welcomeTitle: String? = null,
+    val welcomeSubtitle: String? = null,
+)
+
+data class ProductBoost(val productId: String, val weight: Int = 0)
+
+@Serializable
+data class PremiumProductRow(
+    val id: String,
+    @SerialName("ml_item_id") val mlItemId: String? = null,
+    @SerialName("affiliate_link") val affiliateLink: String? = null,
+    @SerialName("original_affiliate_url") val originalAffiliateUrl: String? = null,
+    val title: String,
+    @SerialName("current_price") val currentPrice: Double? = null,
+    @SerialName("original_price") val originalPrice: Double? = null,
+    @SerialName("discount_percentage") val discountPercentage: Double? = null,
+    val thumbnail: String? = null,
+    val images: List<String> = emptyList(),
+    @SerialName("user_id") val userId: String? = null,
+    val availability: Boolean = true,
+) {
+    fun toProduct(): Product = Product(
+        id = id,
+        title = title,
+        price = currentPrice,
+        currency = "BRL",
+        imageUrl = thumbnail ?: images.firstOrNull(),
+        images = images,
+        oldPrice = originalPrice,
+        discountPercentage = discountPercentage,
+        affiliateUrl = affiliateLink,
+        originalAffiliateUrl = originalAffiliateUrl,
+        userId = userId,
+        priorityTier = 3,
+    )
+}
